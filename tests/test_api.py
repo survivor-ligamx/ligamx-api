@@ -1527,3 +1527,62 @@ def test_sync_status_expone_fingerprint(client):
     r = client.get("/sync/status").json()
     assert "database" in r
     assert "fingerprint" in r["database"] and len(r["database"]["fingerprint"]) == 12
+
+
+# ---------- XI probable/esperado (365Scores, solo dato real) ----------
+
+def _fake_game_lineups(status_home, status_away):
+    """Fabrica un game crudo de 365Scores con lineups en el estado dado."""
+    members = [{"id": i, "name": f"Jugador {i}", "jerseyNumber": i} for i in range(1, 24)]
+
+    def side(status, first_id):
+        mem = [{"id": first_id + i, "status": 1, "position": {"name": "MF"}} for i in range(11)]
+        mem += [{"id": first_id + 11 + i, "status": 2} for i in range(3)]  # suplentes
+        return {"name": "Local" if first_id == 1 else "Visita",
+                "lineups": {"status": status, "formation": "4-3-3", "members": mem}}
+
+    return {
+        "members": members,
+        "homeCompetitor": side(status_home, 1),
+        "awayCompetitor": side(status_away, 12),
+    }
+
+
+def test_365_probable_lineup_disponible(client, monkeypatch):
+    from app.scrapers import scores365_scraper
+    game = _fake_game_lineups("Sin confirmar", "NotConfirmed")  # ambos idiomas
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw",
+                        lambda self, gid: game)
+    r = client.get("/365scores/matches/123/probable-lineup")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["disponible"] is True
+    assert body["fuente"] == "365scores"
+    assert len(body["equipos"]) == 2
+    eq = body["equipos"][0]
+    assert eq["confirmada"] is False
+    assert eq["condicion"] in ("local", "visitante")
+    assert eq["formacion"] == "4-3-3"
+    assert len(eq["titulares_probables"]) == 11   # solo titulares, no suplentes
+
+
+def test_365_probable_lineup_ya_confirmada(client, monkeypatch):
+    from app.scrapers import scores365_scraper
+    game = _fake_game_lineups("Confirmada", "Confirmed")
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw",
+                        lambda self, gid: game)
+    body = client.get("/365scores/matches/123/probable-lineup").json()
+    assert body["disponible"] is False
+    assert body["equipos"] == []
+    assert "confirmad" in body["motivo"].lower()
+
+
+def test_365_probable_lineup_sin_alineacion(client, monkeypatch):
+    from app.scrapers import scores365_scraper
+    # Sin lineups aun (partido lejano): 365Scores no trae el campo
+    game = {"members": [], "homeCompetitor": {"name": "Local"}, "awayCompetitor": {"name": "Visita"}}
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw",
+                        lambda self, gid: game)
+    body = client.get("/365scores/matches/123/probable-lineup").json()
+    assert body["disponible"] is False
+    assert "no publica" in body["motivo"].lower()

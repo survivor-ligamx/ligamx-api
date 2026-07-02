@@ -55,6 +55,16 @@ def lineups(game_id: int):
     return Scores365Scraper().get_match_lineups(game_id)
 
 
+@router.get("/matches/{game_id}/probable-lineup")
+@cached(120)
+def probable_lineup(game_id: int):
+    """XI PROBABLE (esperado) que publica 365Scores ANTES del confirmado, marcado
+    claramente como probable. Solo devuelve datos si 365Scores marca la alineacion
+    como NO confirmada; si ya esta confirmada (usa /lineups) o aun no hay XI,
+    responde `disponible: false` con motivo. No se fabrica ninguna alineacion."""
+    return Scores365Scraper().get_probable_lineup(game_id)
+
+
 @router.get("/matches/{game_id}/events")
 @cached(60)
 def events(game_id: int):

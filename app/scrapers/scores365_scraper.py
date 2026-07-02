@@ -296,6 +296,65 @@ class Scores365Scraper(BaseScraper):
             })
         return {"game_id": game_id, "teams": teams}
 
+    def get_probable_lineup(self, game_id, game: Dict = None) -> Dict:
+        """XI PROBABLE (esperado) que publica 365Scores ANTES del confirmado.
+
+        365Scores marca la alineacion con `lineups.status`:
+          - 'Confirmed'/'Confirmada'   -> ya confirmada (usar get_match_lineups),
+          - 'NotConfirmed'/'Sin confirmar' -> XI PROBABLE (esperado).
+
+        Este metodo devuelve el XI SOLO cuando 365Scores lo marca como NO
+        confirmado (dato real de la fuente). Si ya esta confirmada o si aun no
+        hay alineacion, `disponible=False` (no se inventa ningun XI: regla del
+        proyecto de no fabricar alineaciones).
+        """
+        game = game if game is not None else self._game_raw(game_id)
+        members = {m["id"]: m for m in game.get("members", [])}
+        teams = []
+        any_probable = any_confirmed = False
+        for side in ("homeCompetitor", "awayCompetitor"):
+            c = game.get(side, {}) or {}
+            lu = c.get("lineups") or {}
+            mem = lu.get("members") or []
+            sn = (lu.get("status") or "").lower().replace(" ", "")
+            confirmed = sn.startswith("confirm")  # confirmed / confirmada / confirmado
+            not_confirmed = (sn.startswith("notconfirm") or sn.startswith("sinconfirm")
+                             or sn.startswith("probable") or sn.startswith("expected")
+                             or sn.startswith("esperad"))
+            if mem and confirmed:
+                any_confirmed = True
+            if not (mem and not_confirmed):
+                continue
+            any_probable = True
+            starters = []
+            for m in mem:
+                if not (m.get("status") == 1 or m.get("statusText") == "Starting"):
+                    continue
+                info = members.get(m.get("id"), {})
+                pos = m.get("position", {}) or {}
+                starters.append({
+                    "player_id": int(m["id"]) if m.get("id") else None,
+                    "name": info.get("name") or info.get("shortName"),
+                    "jersey": info.get("jerseyNumber"),
+                    "position": pos.get("name"),
+                })
+            teams.append({
+                "equipo": c.get("name"),
+                "condicion": "local" if side == "homeCompetitor" else "visitante",
+                "formacion": lu.get("formation"),
+                "confirmada": False,
+                "titulares_probables": starters,
+            })
+
+        if any_probable:
+            return {"disponible": True, "fuente": "365scores",
+                    "game_id": game_id, "equipos": teams}
+        motivo = ("El XI ya esta confirmado; usa /365scores/matches/{id}/lineups"
+                  if any_confirmed else
+                  "365Scores aun no publica el XI probable de este partido")
+        return {"disponible": False, "fuente": "365scores",
+                "game_id": game_id, "motivo": motivo, "equipos": []}
+
     def get_match_events(self, game_id) -> List[Dict]:
         """Eventos: goles, tarjetas (amarilla/roja), cambios y goles anulados."""
         game = self._game_raw(game_id)
