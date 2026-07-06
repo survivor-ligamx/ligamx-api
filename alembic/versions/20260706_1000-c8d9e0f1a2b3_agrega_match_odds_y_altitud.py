@@ -1,4 +1,4 @@
-"""agrega tabla match_odds (histórico de momios) y altitude_m a stadiums
+"""agrega tabla match_odds (histórico de momios)
 
 Revision ID: c8d9e0f1a2b3
 Revises: b7c8d9e0f1a2
@@ -19,16 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Idempotente: la app tiene una red de seguridad (create_all) que puede haber
-    # creado ya la tabla/columna. Verificamos antes de crear para no fallar.
+    # creado ya la tabla. Verificamos antes de crear para no fallar.
     bind = op.get_bind()
     insp = sa.inspect(bind)
-
-    # Altitud del estadio (m s.n.m.), opcional.
-    stadium_cols = [c['name'] for c in insp.get_columns('stadiums')]
-    if 'altitude_m' not in stadium_cols:
-        with op.batch_alter_table('stadiums', schema=None) as batch_op:
-            batch_op.add_column(sa.Column('altitude_m', sa.Integer(), nullable=True))
-
     if insp.has_table('match_odds'):
         return  # la tabla ya existe (creada por la red de seguridad): nada que hacer
 
@@ -65,5 +58,3 @@ def downgrade() -> None:
     op.drop_index('ix_match_odds_season', table_name='match_odds')
     op.drop_index('ix_match_odds_id', table_name='match_odds')
     op.drop_table('match_odds')
-    with op.batch_alter_table('stadiums', schema=None) as batch_op:
-        batch_op.drop_column('altitude_m')

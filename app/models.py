@@ -11,7 +11,6 @@ class Stadium(Base):
     capacity = Column(Integer, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    altitude_m = Column(Integer, nullable=True)  # altitud del estadio (m s.n.m.)
     
     teams = relationship("Team", back_populates="stadium")
 

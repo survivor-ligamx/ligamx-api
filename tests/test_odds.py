@@ -39,10 +39,3 @@ def test_get_odds_filtra_por_equipo(client):
     client.post("/odds", json=[_snapshot()], headers={"X-API-Key": "test-key"})
     assert client.get("/odds", params={"home_team": "América"}).json()
     assert client.get("/odds", params={"home_team": "Toluca"}).json() == []
-
-
-def test_stadium_expone_altitud(client, seeded):
-    r = client.get("/stadiums")
-    assert r.status_code == 200
-    # El campo altitude_m debe existir en el contrato (aunque sea None).
-    assert "altitude_m" in r.json()[0]
