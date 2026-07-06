@@ -18,9 +18,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Idempotente: la app tiene una red de seguridad (create_all) que puede haber
+    # creado ya la tabla/columna. Verificamos antes de crear para no fallar.
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
     # Altitud del estadio (m s.n.m.), opcional.
-    with op.batch_alter_table('stadiums', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('altitude_m', sa.Integer(), nullable=True))
+    stadium_cols = [c['name'] for c in insp.get_columns('stadiums')]
+    if 'altitude_m' not in stadium_cols:
+        with op.batch_alter_table('stadiums', schema=None) as batch_op:
+            batch_op.add_column(sa.Column('altitude_m', sa.Integer(), nullable=True))
+
+    if insp.has_table('match_odds'):
+        return  # la tabla ya existe (creada por la red de seguridad): nada que hacer
 
     # Histórico de momios (serie temporal por partido).
     op.create_table(

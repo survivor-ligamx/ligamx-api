@@ -34,6 +34,15 @@ access_logger = logging.getLogger("ligamx.access")
 if engine.dialect.name == "sqlite":
     Base.metadata.create_all(bind=engine)
 
+# Red de seguridad para TABLAS NUEVAS: si el deploy no corre `alembic upgrade head`
+# (p. ej. Start Command sin migracion), garantizamos que las tablas que aun no
+# existan se creen. `create_all` con checkfirst NO altera ni borra tablas
+# existentes (los cambios de COLUMNAS los sigue gestionando Alembic). Idempotente.
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception:  # pragma: no cover - nunca debe impedir el arranque
+    logging.getLogger("ligamx").warning("create_all de respaldo fallo (se ignora)", exc_info=True)
+
 scheduler = BackgroundScheduler()
 
 def auto_sync():
