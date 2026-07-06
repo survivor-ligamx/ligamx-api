@@ -11,6 +11,7 @@ class Stadium(Base):
     capacity = Column(Integer, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+    altitude_m = Column(Integer, nullable=True)  # altitud del estadio (m s.n.m.)
     
     teams = relationship("Team", back_populates="stadium")
 
@@ -254,3 +255,32 @@ class MatchLineup(Base):
     jersey_number = Column(Integer, nullable=True)
     
     match = relationship("Match", back_populates="match_lineups")
+
+
+class MatchOdds(Base):
+    """
+    Snapshot de MOMIOS de un partido en un momento dado (histórico de mercado).
+
+    Se guarda de forma denormalizada (por nombres de equipo + fecha) para que el
+    cliente pueda archivar sin resolver ids internos. Cada POST es una fila nueva
+    con su `captured_at`: es una SERIE TEMPORAL (los momios se mueven), pensada
+    para poder backtestear luego la mezcla modelo+mercado con datos reales.
+    """
+    __tablename__ = "match_odds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    season = Column(String, nullable=True, index=True)
+    home_team = Column(String, index=True)
+    away_team = Column(String, index=True)
+    match_date = Column(DateTime, nullable=True)
+    source = Column(String, nullable=True)          # p. ej. "odds-api.io", casa
+    # 1X2 (cuota decimal)
+    odds_local = Column(Float, nullable=True)
+    odds_empate = Column(Float, nullable=True)
+    odds_visita = Column(Float, nullable=True)
+    # Over/Under
+    ou_linea = Column(Float, nullable=True)
+    odds_over = Column(Float, nullable=True)
+    odds_under = Column(Float, nullable=True)
+    extra = Column(JSON, nullable=True)             # payload completo (por si acaso)
+    captured_at = Column(DateTime, default=func.now(), index=True)

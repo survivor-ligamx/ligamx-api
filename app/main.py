@@ -18,7 +18,7 @@ from app.database import engine, Base
 from app import models  # noqa: F401  (registra los modelos en Base.metadata)
 from app.rate_limit import limiter
 from app.metrics import metrics
-from app.routers import health, teams, matches, standings, stadiums, players, stats, news, sync, sofascore, scores365, extras, search, live, analytics, overview
+from app.routers import health, teams, matches, standings, stadiums, players, stats, news, sync, sofascore, scores365, extras, search, live, analytics, overview, odds
 
 # Logging estructurado basico (timestamp, nivel, logger). En produccion se puede
 # enviar a un colector; aqui dejamos un formato consistente para todos los logs.
@@ -119,7 +119,8 @@ app.add_middleware(
 ROUTERS = [
     health.router, teams.router, matches.router, standings.router, stadiums.router,
     players.router, stats.router, news.router, sync.router, sofascore.router,
-    scores365.router, extras.router, search.router, live.router, analytics.router, overview.router,
+    scores365.router, extras.router, search.router, live.router, analytics.router,
+    overview.router, odds.router,
 ]
 
 for _r in ROUTERS:

@@ -9,6 +9,7 @@ class StadiumBase(BaseModel):
     capacity: Optional[int] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    altitude_m: Optional[int] = None
 
 class StadiumResponse(StadiumBase):
     id: int
@@ -195,4 +196,26 @@ class PlayerMatchStatResponse(BaseModel):
     interceptions: Optional[int] = None
     rating: Optional[float] = None
     stats: Optional[dict] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MatchOddsCreate(BaseModel):
+    """Snapshot de momios de un partido para archivar (POST /odds)."""
+    home_team: str
+    away_team: str
+    season: Optional[str] = None
+    match_date: Optional[datetime] = None
+    source: Optional[str] = None
+    odds_local: Optional[float] = None
+    odds_empate: Optional[float] = None
+    odds_visita: Optional[float] = None
+    ou_linea: Optional[float] = None
+    odds_over: Optional[float] = None
+    odds_under: Optional[float] = None
+    extra: Optional[dict] = None
+
+
+class MatchOddsResponse(MatchOddsCreate):
+    id: int
+    captured_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
