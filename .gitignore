@@ -3,6 +3,9 @@ venv/
 .venv/
 env/
 
+# Intérprete Python 3.11 standalone (local, no versionar)
+.python311/
+
 # Python
 __pycache__/
 *.pyc
@@ -31,3 +34,9 @@ _smoke_test.py
 # Capturas de pantalla (no versionar; usar docs/ o el PDF oficial)
 Captura*.png
 *.screenshot.png
+
+# Artefactos locales de herramientas (no versionar; pueden traer secretos).
+# postman/ incluye environments con sync_api_key -> NO debe subirse a git.
+.kiro/
+.postman.json
+postman/
