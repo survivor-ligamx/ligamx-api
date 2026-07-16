@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -63,7 +63,7 @@ def season_info(db: Session = Depends(get_db)):
         .order_by(models.Match.match_date)
         .first()
     )
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     first_date = to_naive_utc(first.match_date if first else None)
     started = bool(first_date and first_date <= now)
     return {

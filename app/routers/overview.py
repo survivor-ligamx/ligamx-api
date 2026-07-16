@@ -1,6 +1,6 @@
 """Vista de resumen ('dashboard'): todo lo clave de la temporada en UNA llamada.
 Ideal para la pantalla principal de una app o un bot."""
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
@@ -34,7 +34,7 @@ def dashboard(season: str = Query(None), db: Session = Depends(get_db)):
     últimos resultados y noticias recientes."""
     season_id = resolve_season_id(db, season)
     label = resolve_season_label(db, season)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     leader = None
     if season_id is not None:

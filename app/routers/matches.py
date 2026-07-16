@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import unicodedata
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session, joinedload
@@ -80,7 +80,7 @@ def get_calendar(season: str = Query(None, description="Etiqueta o ano; por defe
 
 @router.get("/matches/upcoming", response_model=list[schemas.MatchResponse])
 def get_upcoming_matches(limit: int = Query(10, ge=1, le=50), db: Session = Depends(get_db)):
-    return db.query(models.Match).options(joinedload(models.Match.home_team), joinedload(models.Match.away_team)).filter(models.Match.match_date >= datetime.utcnow()).order_by(models.Match.match_date).limit(limit).all()
+    return db.query(models.Match).options(joinedload(models.Match.home_team), joinedload(models.Match.away_team)).filter(models.Match.match_date >= datetime.now(timezone.utc)).order_by(models.Match.match_date).limit(limit).all()
 
 @router.get("/matches/team/{team_id}", response_model=list[schemas.MatchResponse])
 def get_team_matches(team_id: int, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
@@ -230,7 +230,7 @@ def get_weeks(db: Session = Depends(get_db)):
 
 @router.get("/weeks/current")
 def get_current_week(db: Session = Depends(get_db)):
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     matches = db.query(models.Match).filter(models.Match.match_date.isnot(None)).order_by(models.Match.match_date).all()
     if not matches:
         raise HTTPException(status_code=404, detail="No hay partidos")

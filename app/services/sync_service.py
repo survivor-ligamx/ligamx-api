@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 import re
@@ -704,7 +704,7 @@ def run_sync(db, source: str = "espn"):
 def run_sync_with_log(db, source: str = "espn"):
     """Ejecuta run_sync y registra el resultado (exito o error) en sync_logs.
     Devuelve el resultado del sync; relanza la excepcion si falla."""
-    started = datetime.utcnow()
+    started = datetime.now(timezone.utc)
     try:
         result = run_sync(db, source)
     except Exception as e:
@@ -713,7 +713,7 @@ def run_sync_with_log(db, source: str = "espn"):
             db.add(models.SyncLog(
                 source=source, status="error", detail=str(e)[:500],
                 started_at=started,
-                duration_seconds=(datetime.utcnow() - started).total_seconds(),
+                duration_seconds=(datetime.now(timezone.utc) - started).total_seconds(),
             ))
             db.commit()
         except Exception:
@@ -726,7 +726,7 @@ def run_sync_with_log(db, source: str = "espn"):
             teams=result.get("teams"), players=result.get("players"),
             matches=result.get("matches"),
             started_at=started,
-            duration_seconds=(datetime.utcnow() - started).total_seconds(),
+            duration_seconds=(datetime.now(timezone.utc) - started).total_seconds(),
         ))
         db.commit()
     except Exception:
@@ -795,7 +795,7 @@ def run_backfill(db, year: int, tournament: str, source: str = "espn"):
 
 def run_backfill_with_log(db, year: int, tournament: str, source: str = "espn"):
     """Ejecuta run_backfill y registra el resultado en sync_logs."""
-    started = datetime.utcnow()
+    started = datetime.now(timezone.utc)
     try:
         result = run_backfill(db, year, tournament, source)
     except Exception as e:
@@ -804,7 +804,7 @@ def run_backfill_with_log(db, year: int, tournament: str, source: str = "espn"):
             db.add(models.SyncLog(
                 source=f"backfill:{tournament} {year}", status="error", detail=str(e)[:500],
                 started_at=started,
-                duration_seconds=(datetime.utcnow() - started).total_seconds(),
+                duration_seconds=(datetime.now(timezone.utc) - started).total_seconds(),
             ))
             db.commit()
         except Exception:
@@ -816,7 +816,7 @@ def run_backfill_with_log(db, year: int, tournament: str, source: str = "espn"):
             season=result.get("season"), teams=result.get("teams"),
             matches=result.get("matches"),
             started_at=started,
-            duration_seconds=(datetime.utcnow() - started).total_seconds(),
+            duration_seconds=(datetime.now(timezone.utc) - started).total_seconds(),
         ))
         db.commit()
     except Exception:

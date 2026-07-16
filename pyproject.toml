@@ -1,0 +1,97 @@
+[project]
+name = "ligamx-api"
+version = "1.0.0"
+description = "API REST de la Liga MX (Apertura 2026) con datos de múltiples fuentes públicas (ESPN, 365Scores, TheSportsDB, Google News). Incluye: equipos, jugadores, partidos, tabla, goleadores, estadísticas avanzadas (xG), alineaciones, heatmaps, calendario, Liguilla, noticias, marcadores en vivo (SSE), comparador y predictor."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "BRUCEWAYNE0180", email = "brucewayne0180@github.com"}
+]
+keywords = ["liga-mx", "football", "soccer", "api", "fastapi", "espn", "365scores", "xg", "stats"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "SQLAlchemy>=2.0.38",
+    "pydantic>=2.11",
+    "psycopg2-binary>=2.9.10",
+    "alembic>=1.14.0",
+    "requests>=2.31.0",
+    "feedparser>=6.0.11",
+    "APScheduler>=3.10.4",
+    "python-dotenv>=1.0.1",
+    "slowapi>=0.1.9",
+    "redis>=5.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.5",
+    "pytest-mock==3.14.0",
+    "pytest-asyncio==0.25.3",
+    "httpx==0.28.1",
+    "ruff==0.15.21",
+    "mypy==1.14.1",
+    "factory-boy==3.3.1",
+    "faker==33.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 200
+select = ["E", "F", "W"]
+ignore = ["E701", "E401", "E402"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = true
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true
+show_error_codes = true
+pretty = true
+explicit_package_bases = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-q --tb=short -x"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*", "scripts/*", "alembic/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

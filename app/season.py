@@ -31,7 +31,7 @@ def current_tournament(now: datetime = None):
 
     Por eso usamos meses 6-12 => Apertura, 1-5 => Clausura.
     """
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     if now.month >= 6:
         return "Apertura", now.year
     return "Clausura", now.year

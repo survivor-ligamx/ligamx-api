@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, case
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 import unicodedata
 from app.database import get_db
@@ -278,7 +278,7 @@ def get_team_profile(team_id: int, season: str = Query(None), db: Session = Depe
 
     nxt = (db.query(models.Match).options(joinedload(models.Match.home_team), joinedload(models.Match.away_team))
            .filter((models.Match.home_team_id == team_id) | (models.Match.away_team_id == team_id),
-                   models.Match.match_date >= datetime.utcnow())
+                   models.Match.match_date >= datetime.now(timezone.utc))
            .order_by(models.Match.match_date).first())
 
     def _brief(m):

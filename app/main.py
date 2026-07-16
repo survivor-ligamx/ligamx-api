@@ -114,9 +114,17 @@ async def security_headers(request, call_next):
     return response
 
 
+# CORS configurable: en producción usa CORS_ORIGINS="https://tudominio.com,https://otro.com"
+# En desarrollo deja vacío o pon "*" (no recomendado en prod).
+_cors_raw = os.getenv("CORS_ORIGINS", "").strip()
+if _cors_raw:
+    allow_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
+else:
+    allow_origins = ["*"]  # fallback dev; en prod DEBES definir CORS_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

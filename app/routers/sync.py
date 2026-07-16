@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -116,7 +116,7 @@ def sync_status(db: Session = Depends(get_db)):
 
     age_seconds = None
     if last_success and last_success.finished_at:
-        age_seconds = (datetime.utcnow() - to_naive_utc(last_success.finished_at)).total_seconds()
+        age_seconds = (datetime.now(timezone.utc).replace(tzinfo=None) - to_naive_utc(last_success.finished_at)).total_seconds()
 
     # Umbral de obsolescencia (horas). El sync corre cada 2h; damos margen para
     # una corrida perdida antes de marcar los datos como "viejos".
