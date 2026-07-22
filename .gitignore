@@ -40,3 +40,5 @@ Captura*.png
 .kiro/
 .postman.json
 postman/
+_pytest.db
+.coverage

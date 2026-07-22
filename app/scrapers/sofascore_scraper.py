@@ -1,4 +1,5 @@
 import requests
+from typing import Any
 import time
 
 TOURNAMENT_ID = 11621
@@ -40,8 +41,8 @@ def get_lineups(event_id):
 
 def get_player_stats(season_id=SEASON_ID, limit=100):
     events = get_events(season_id)
-    stats = {}
-    seen = {}
+    stats: dict[str, Any] = {}
+    seen: dict[str, Any] = {}
     for ev in events:
         eid = ev.get("id")
         if not eid or ev.get("status", {}).get("type") != "finished":

@@ -1,6 +1,6 @@
 import time, requests, logging
 from datetime import datetime, timezone
-from typing import List, Dict
+from typing import Optional, List, Dict, Any
 from app.scrapers.base import BaseScraper
 
 
@@ -96,7 +96,7 @@ class ESPNRequestsScraper(BaseScraper):
                 players.append({"id":int(ath.get("id")) if ath.get("id") else None, "name":ath.get("displayName", ""), "team_name":team["name"], "position":(ath.get("position") or {}).get("abbreviation") or (ath.get("position") or {}).get("name"), "number":int(ath.get("jersey")) if ath.get("jersey") not in (None, "") else None, "nationality":nationality, "birth_date":ath.get("dateOfBirth"), "photo_url":(ath.get("headshot") or {}).get("href") if ath.get("headshot") else None, "flag_url":(ath.get("flag") or {}).get("href") if ath.get("flag") else None, "height":ath.get("displayHeight"), "weight":ath.get("displayWeight")})
             time.sleep(0.15)
         return players
-    def get_matches(self, season_id: int = None, tournament: str = None) -> List[Dict]:
+    def get_matches(self, season_id: Optional[int] = None, tournament: Optional[str] = None) -> List[Dict]:
         teams=self._teams or self.get_teams()
         if not teams: return []
         tnames={t["name"] for t in teams}
@@ -129,8 +129,8 @@ class ESPNRequestsScraper(BaseScraper):
                 eid=ev.get("id")
                 if not eid or eid in matches: continue
                 comp=ev.get("competitions", [{}])[0]
-                home=next((c for c in comp.get("competitors", []) if c.get("homeAway")=="home"), {})
-                away=next((c for c in comp.get("competitors", []) if c.get("homeAway")=="away"), {})
+                home: dict[str, Any] = next((c for c in comp.get("competitors", []) if c.get("homeAway")=="home"), {})
+                away: dict[str, Any] = next((c for c in comp.get("competitors", []) if c.get("homeAway")=="away"), {})
                 hn=home.get("team", {}).get("displayName", "")
                 an=away.get("team", {}).get("displayName", "")
                 if hn not in tnames or an not in tnames: continue
@@ -155,16 +155,16 @@ class ESPNRequestsScraper(BaseScraper):
             if st.get("state") != "in":
                 continue
             comp = ev.get("competitions", [{}])[0]
-            home = next((c for c in comp.get("competitors", []) if c.get("homeAway") == "home"), {})
-            away = next((c for c in comp.get("competitors", []) if c.get("homeAway") == "away"), {})
+            home: dict[str, Any] = next((c for c in comp.get("competitors", []) if c.get("homeAway") == "home"), {})
+            away: dict[str, Any] = next((c for c in comp.get("competitors", []) if c.get("homeAway") == "away"), {})
             if not home or not away:
                 continue
             live.append({
                 "event_id": ev.get("id"),
                 "home_team": home.get("team", {}).get("displayName"),
                 "away_team": away.get("team", {}).get("displayName"),
-                "home_score": int(home.get("score")) if home.get("score") not in (None, "") else 0,
-                "away_score": int(away.get("score")) if away.get("score") not in (None, "") else 0,
+                "home_score": int(home.get("score")) if home.get("score") not in (None, "") else 0,  # type: ignore[arg-type]
+                "away_score": int(away.get("score")) if away.get("score") not in (None, "") else 0,  # type: ignore[arg-type]
                 "status": "live",
                 "match_date": ev.get("date"),
                 "clock": ev.get("status", {}).get("displayClock"),
@@ -182,8 +182,8 @@ class ESPNRequestsScraper(BaseScraper):
         matches = []
         for ev in data.get("events", []):
             comp = ev.get("competitions", [{}])[0]
-            home = next((c for c in comp.get("competitors", []) if c.get("homeAway") == "home"), {})
-            away = next((c for c in comp.get("competitors", []) if c.get("homeAway") == "away"), {})
+            home = next((c for c in comp.get("competitors", []) if c.get("homeAway") == "home"), {})  # type: ignore[var-annotated]
+            away = next((c for c in comp.get("competitors", []) if c.get("homeAway") == "away"), {})  # type: ignore[var-annotated]
             if not home or not away:
                 continue
             st = ev.get("status", {}).get("type", {})
@@ -192,8 +192,8 @@ class ESPNRequestsScraper(BaseScraper):
                 "event_id": ev.get("id"),
                 "home_team": home.get("team", {}).get("displayName"),
                 "away_team": away.get("team", {}).get("displayName"),
-                "home_score": int(home.get("score")) if home.get("score") not in (None, "") else None,
-                "away_score": int(away.get("score")) if away.get("score") not in (None, "") else None,
+                "home_score": int(home.get("score")) if home.get("score") not in (None, "") else None,  # type: ignore[arg-type]
+                "away_score": int(away.get("score")) if away.get("score") not in (None, "") else None,  # type: ignore[arg-type]
                 "status": status,
                 "match_date": ev.get("date"),
                 "clock": ev.get("status", {}).get("displayClock"),
@@ -256,7 +256,7 @@ class ESPNRequestsScraper(BaseScraper):
             return {"event_id": event_id, "teams": []}
         teams = []
         for r in data.get("rosters", []):
-            starters, bench = [], []
+            starters, bench = [], []  # type: ignore[var-annotated]
             for pl in r.get("roster", []):
                 ath = pl.get("athlete", {}) or {}
                 pos = pl.get("position", {}) or {}
@@ -335,8 +335,8 @@ class ESPNRequestsScraper(BaseScraper):
         header = data.get("header", {}) or {}
         comp = (header.get("competitions") or [{}])[0]
         competitors = comp.get("competitors", [])
-        home = next((c for c in competitors if c.get("homeAway") == "home"), {})
-        away = next((c for c in competitors if c.get("homeAway") == "away"), {})
+        home = next((c for c in competitors if c.get("homeAway") == "home"), {})  # type: ignore[var-annotated]
+        away = next((c for c in competitors if c.get("homeAway") == "away"), {})  # type: ignore[var-annotated]
         status = comp.get("status", {}) or {}
         st = status.get("type", {}) or {}
         state = "finished" if st.get("completed") else "live" if st.get("state") == "in" else "scheduled"
@@ -359,7 +359,7 @@ class ESPNRequestsScraper(BaseScraper):
         }
 
 
-    def get_team_season_stats(self, team_id, year: int = None) -> Dict:
+    def get_team_season_stats(self, team_id, year: Optional[int] = None) -> Dict:
         """Estadisticas de EQUIPO agregadas de la temporada (via el core API de
         ESPN): ~100+ metricas en 4 categorias (defensive, general, goalKeeping,
         offensive) -> porterias a cero, goles recibidos, pases completados,

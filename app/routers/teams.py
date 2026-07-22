@@ -88,7 +88,7 @@ def get_team_stats(team_id: int, season: str = Query(None), db: Session = Depend
             if getattr(s, k):
                 totals[k] += getattr(s, k)
         if s.possession:
-            possession_sum += s.possession
+            possession_sum += s.possession  # type: ignore[assignment]
             count += 1
     return {"team_id": team_id, "season": label, "matches": len(stats), "possession_avg": round(possession_sum / count, 1) if count else None, "totals": totals}
 
@@ -146,7 +146,7 @@ def get_team_form(team_id: int, limit: int = Query(5, ge=1, le=20), db: Session 
         "team_id": team_id,
         "played": len(results),
         "summary": summary,
-        "form": "".join(r["result"] for r in results),
+        "form": "".join(r["result"] for r in results),  # type: ignore[misc]
         "matches": results,
     }
 
@@ -229,7 +229,7 @@ def get_team_streak(team_id: int, db: Session = Depends(get_db)):
     return {
         "team_id": team_id,
         "matches_played": len(results),
-        "recent_form": "".join(r["result"] for r in results[:5]),
+        "recent_form": "".join(r["result"] for r in results[:5]),  # type: ignore[misc]
         "streaks": {
             "unbeaten": run_while(lambda r: r["result"] in ("W", "D")),
             "wins": run_while(lambda r: r["result"] == "W"),

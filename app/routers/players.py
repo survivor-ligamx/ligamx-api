@@ -5,6 +5,7 @@ import unicodedata
 from app.database import get_db
 from app.dependencies import get_or_404, resolve_season_label, resolve_season_id, discipline_summary
 from app import models, schemas
+from typing import Optional
 
 router = APIRouter()
 
@@ -65,11 +66,11 @@ def season_leaders(
     expr, _ = _LEADER_AGG.get(stat, _LEADER_AGG["goals"])
     M = models.PlayerMatchStat
     rows = (
-        db.query(M.player_name, M.team_name, func.count(M.id).label("apps"), expr.label("value"))
+        db.query(M.player_name, M.team_name, func.count(M.id).label("apps"), expr.label("value"))  # type: ignore[attr-defined]
         .filter(M.season == label)
         .group_by(M.player_name, M.team_name)
         .having(func.count(M.id) >= min_appearances)
-        .order_by(expr.desc())
+        .order_by(expr.desc())  # type: ignore[attr-defined]
         .limit(limit)
         .all()
     )
@@ -202,7 +203,7 @@ def players_leaderboard(
         expr, _ = _LEADER_AGG[metric]
         M = models.PlayerMatchStat
         rows = (
-            db.query(M.player_name, M.team_name, func.count(M.id).label("apps"), expr.label("value"))
+            db.query(M.player_name, M.team_name, func.count(M.id).label("apps"), expr.label("value"))  # type: ignore[assignment, attr-defined]
             .filter(M.season == label)
             .group_by(M.player_name, M.team_name)
             .having(func.count(M.id) >= min_appearances)
@@ -270,9 +271,9 @@ def search_players(
     nnat = _norm(nationality) if nationality else None
     out = []
     for p in candidates:
-        if nq and nq not in _norm(p.name):
+        if nq and nq not in _norm(p.name):  # type: ignore[arg-type]
             continue
-        if nnat and nnat not in _norm(p.nationality or ""):
+        if nnat and nnat not in _norm(p.nationality or ""):  # type: ignore[arg-type]
             continue
         out.append(p)
         if len(out) >= limit:
@@ -297,7 +298,7 @@ def get_player_stat(player_id: int, db: Session = Depends(get_db), season: str =
     return stat
 
 
-def _player_match_rows(db, player, season: str = None):
+def _player_match_rows(db, player, season: Optional[str] = None):
     """Filas de player_match_stats de un jugador en una temporada.
 
     Estrategia robusta: si el jugador tiene `external_365_id` (mapa de identidad),

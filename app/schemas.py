@@ -14,7 +14,7 @@ class StadiumResponse(StadiumBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def maps_url(self) -> Optional[str]:
         """Link a Google Maps del estadio (por coordenadas si las hay, o por

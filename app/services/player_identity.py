@@ -14,6 +14,7 @@ import logging
 import unicodedata
 
 from app import models
+from typing import Optional
 
 logger = logging.getLogger("ligamx.identity")
 
@@ -87,7 +88,7 @@ def _best_match(src_name: str, candidates: list[models.Player]):
     """Devuelve (mejor_player, score, es_inequivoco) para un nombre de 365Scores
     contra los jugadores ESPN de su equipo."""
     scored = sorted(
-        ((name_match_score(src_name, p.name), p) for p in candidates),
+        ((name_match_score(src_name, p.name), p) for p in candidates),  # type: ignore[arg-type]
         key=lambda t: t[0],
         reverse=True,
     )
@@ -99,7 +100,7 @@ def _best_match(src_name: str, candidates: list[models.Player]):
     return best_player, best_score, unambiguous
 
 
-def build_player_identity_map(db, season: str = None, force: bool = False) -> dict:
+def build_player_identity_map(db, season: Optional[str] = None, force: bool = False) -> dict:
     """Rellena `players.external_365_id` cruzando por nombre+equipo contra
     `player_match_stats`. Idempotente. Devuelve un resumen del resultado.
 

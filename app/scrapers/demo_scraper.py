@@ -1,5 +1,5 @@
 from app.scrapers.base import BaseScraper
-from typing import List, Dict
+from typing import Optional, List, Dict
 
 class DemoScraper(BaseScraper):
     """Scraper de demostración con datos de ejemplo.
@@ -34,7 +34,7 @@ class DemoScraper(BaseScraper):
             {"id": 5, "name": "Sergio Canales", "position": "Mediocampista", "number": 10, "team_name": "Monterrey", "nationality": "España"},
         ]
     
-    def get_matches(self, season_id: int = None) -> List[Dict]:
+    def get_matches(self, season_id: Optional[int] = None) -> List[Dict]:
         return [
             {"home_team": "Club América", "away_team": "Chivas", "home_score": 2, "away_score": 1, "status": "finished"},
             {"home_team": "Tigres UANL", "away_team": "Monterrey", "home_score": 1, "away_score": 1, "status": "finished"},

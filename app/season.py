@@ -9,6 +9,7 @@ ano (p. ej. "2026") es ambiguo. Estas funciones resuelven el torneo vigente a
 partir del mes, para etiquetar los datos de forma clara (p. ej. "Apertura 2026").
 """
 from datetime import datetime, timezone
+from typing import Optional
 
 
 def to_naive_utc(dt):
@@ -21,7 +22,7 @@ def to_naive_utc(dt):
     return dt
 
 
-def current_tournament(now: datetime = None):
+def current_tournament(now: Optional[datetime] = None):
     """Devuelve (tipo_de_torneo, ano) vigente o proximo segun la fecha.
 
     Calendario Liga MX:
@@ -48,12 +49,12 @@ def tournament_from_matches(matches):
     return counts.most_common(1)[0][0]
 
 
-def current_season_year(now: datetime = None) -> str:
+def current_season_year(now: Optional[datetime] = None) -> str:
     """Ano de la temporada vigente como string (clave usada en stats)."""
     return str(current_tournament(now)[1])
 
 
-def current_season_name(now: datetime = None) -> str:
+def current_season_name(now: Optional[datetime] = None) -> str:
     """Nombre completo de la temporada vigente, p. ej. 'Apertura 2026'."""
     tournament, year = current_tournament(now)
     return f"{tournament} {year}"

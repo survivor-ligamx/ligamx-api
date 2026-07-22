@@ -6,7 +6,7 @@
 - Scorebat: highlights en video (fallback; su API v3 quedo deprecada).
 """
 import logging
-from typing import Dict, List
+from typing import Optional, Dict, List
 import requests
 
 logger = logging.getLogger(__name__)
@@ -21,10 +21,10 @@ _HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
 
 
-def _get_json(url: str, params: Dict = None) -> Dict:
+def _get_json(url: str, params: Optional[Dict] = None) -> Dict:
     r = requests.get(url, headers=_HEADERS, params=params, timeout=20)
     r.raise_for_status()
-    return r.json()
+    return r.json()  # type: ignore[no-any-return]
 
 
 def _event_to_dict(e: Dict) -> Dict:

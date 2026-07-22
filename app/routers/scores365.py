@@ -178,11 +178,11 @@ def _team_impact(db: Session, team: dict, label: str) -> dict:
     # Nombre del equipo: preferimos el de la BD (mismo texto que ESPN); si no,
     # normalizamos el de 365Scores con el mapa compartido.
     raw_name = team.get("team_name")
-    team_name = LIGAMX_TEAM_NAME_MAP.get(raw_name, raw_name)
+    team_name = LIGAMX_TEAM_NAME_MAP.get(raw_name, raw_name)  # type: ignore[arg-type]
     if team_id is not None:
         t = db.get(models.Team, team_id)
         if t:
-            team_name = t.name
+            team_name = t.name  # type: ignore[assignment]
 
     # Produccion (goles + asistencias) de toda la plantilla del equipo en la temporada.
     prod_by_id, name_by_id = {}, {}
@@ -207,14 +207,14 @@ def _team_impact(db: Session, team: dict, label: str) -> dict:
 
     # Top-5 jugadores del equipo por importancia (produccion en la temporada).
     top5 = sorted(prod_by_id.items(), key=lambda kv: kv[1], reverse=True)[:5]
-    ausentes, titulares = [], []
+    ausentes, titulares = [], []  # type: ignore[var-annotated]
     for pid, _prod in top5:
         entry = {"jugador": name_by_id.get(pid), "importancia_pct": _pct(pid)}
         if entry["importancia_pct"] <= 0:
             continue
         (titulares if pid in starter_ids else ausentes).append(entry)
 
-    return {
+    return {  # type: ignore[return-value]
         "team_id": team_id,
         "fuerza_xi_pct": min(fuerza, 100.0),
         "titulares_confirmados": len(starter_ids),

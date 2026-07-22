@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 import math
+from typing import Any
 from app.database import get_db
 from app.dependencies import resolve_season_id, resolve_season_label, latest_season, _apertura_first, find_season
 from app import models, schemas
@@ -256,7 +257,7 @@ def liguilla_results(season: str = Query(None), db: Session = Depends(get_db)):
         .all()
     )
 
-    series = {}
+    series: dict[Any, Any] = {}
     for m in matches:
         phase, phase_label, order = _classify_phase(m.round_name, m.stage_name)
         if not phase or m.home_team_id is None or m.away_team_id is None:
@@ -301,7 +302,7 @@ def liguilla_results(season: str = Query(None), db: Session = Depends(get_db)):
         })
     out.sort(key=lambda r: r["order"])
 
-    by_phase = {}
+    by_phase: dict[str, Any] = {}
     for r in out:
         by_phase.setdefault(r["phase"], []).append(r)
 

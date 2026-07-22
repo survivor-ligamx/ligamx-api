@@ -15,11 +15,11 @@ import os
 import json
 import hashlib
 import logging
-from typing import Callable
+from typing import Callable, Any
 
 logger = logging.getLogger(__name__)
 
-_store = {}
+_store: dict[str, Any] = {}
 _lock = threading.Lock()
 _PREFIX = "ligamx:cache:"
 

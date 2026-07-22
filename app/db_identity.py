@@ -9,6 +9,7 @@ DATABASE_URL del web service, sin filtrar la cadena de conexion.
 import hashlib
 import os
 from urllib.parse import urlparse
+from typing import Optional
 
 
 def _normalize(url: str):
@@ -32,7 +33,7 @@ def _normalize(url: str):
     return (dialect, host or None, dbname)
 
 
-def db_target(url: str = None) -> dict:
+def db_target(url: Optional[str] = None) -> dict:
     """Objetivo de la BD en claro pero SIN credenciales (dialect/host/dbname).
     Apto para logs de CI (privados), no para respuestas publicas."""
     url = url if url is not None else os.environ.get("DATABASE_URL", "sqlite:///./ligamx.db")
@@ -40,7 +41,7 @@ def db_target(url: str = None) -> dict:
     return {"dialect": dialect, "host": host, "dbname": dbname}
 
 
-def db_fingerprint(url: str = None) -> str:
+def db_fingerprint(url: Optional[str] = None) -> str:
     """Huella corta y estable de host+dbname (sin credenciales). Segura para
     exponer en una API publica: no revela host ni usuario, solo permite comparar
     si dos entornos apuntan a la misma base."""

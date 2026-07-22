@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import unicodedata
+from typing import Any
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
@@ -23,7 +24,7 @@ def _canonical_team_ids(db: Session, team: "models.Team") -> set:
     posibles filas duplicadas del mismo club a lo largo de las temporadas o
     fuentes (p. ej. si un sync viejo lo cargo con otro id). Incluye siempre el
     id propio, asi el H2H nunca devuelve menos de lo que ya devolvia."""
-    nq = _norm(team.name)
+    nq = _norm(team.name)  # type: ignore[arg-type]
     ids = {t.id for t in db.query(models.Team.id, models.Team.name).all() if _norm(t.name) == nq}
     ids.add(team.id)
     return ids
@@ -56,7 +57,7 @@ def get_calendar(season: str = Query(None, description="Etiqueta o ano; por defe
         q = q.filter(models.Match.season_id == season_id)
     matches = q.order_by(models.Match.week_number, models.Match.match_date).all()
 
-    jornadas = {}
+    jornadas: dict[Any, Any] = {}
     for m in matches:
         jn = m.week_number or 0
         j = jornadas.setdefault(jn, {"jornada": m.week_number, "matches": []})
@@ -129,8 +130,8 @@ def get_h2h_summary(team1_id: int, team2_id: int, db: Session = Depends(get_db))
             g1, g2 = m.home_score, m.away_score
         else:
             g1, g2 = m.away_score, m.home_score
-        t1_goals += g1
-        t2_goals += g2
+        t1_goals += g1  # type: ignore[assignment]
+        t2_goals += g2  # type: ignore[assignment]
         if g1 > g2:
             t1_wins += 1
         elif g2 > g1:
@@ -197,7 +198,7 @@ def _external_event_id(match_id: int, db: Session) -> str:
     match = get_or_404(db, models.Match, match_id)
     if not match.external_event_id:
         raise HTTPException(status_code=404, detail="Este partido no tiene id externo de la fuente")
-    return match.external_event_id
+    return match.external_event_id  # type: ignore[no-any-return]
 
 
 @router.get("/matches/{match_id}/stats")
@@ -277,7 +278,7 @@ def get_match_squad(match_id: int, db: Session = Depends(get_db)):
     con posicion y dorsal."""
     get_or_404(db, models.Match, match_id)
     rows = db.query(models.MatchLineup).filter(models.MatchLineup.match_id == match_id).all()
-    teams = {}
+    teams: dict[Any, Any] = {}
     for r in rows:
         t = teams.setdefault(r.team_id, {
             "team_id": r.team_id, "team_name": r.team_name,
@@ -298,7 +299,7 @@ def get_match_player_stats_db(match_id: int, db: Session = Depends(get_db)):
     intercepciones, rating... para TODOS los jugadores, agrupadas por equipo."""
     get_or_404(db, models.Match, match_id)
     rows = db.query(models.PlayerMatchStat).filter(models.PlayerMatchStat.match_id == match_id).all()
-    teams = {}
+    teams: dict[Any, Any] = {}
     for r in rows:
         t = teams.setdefault(r.team_id, {"team_id": r.team_id, "team_name": r.team_name, "players": []})
         t["players"].append({
@@ -333,7 +334,7 @@ def get_match_full(match_id: int, db: Session = Depends(get_db)):
         .all()
     )
     lineup_rows = db.query(models.MatchLineup).filter(models.MatchLineup.match_id == match_id).all()
-    lineups = {}
+    lineups: dict[Any, Any] = {}
     for r in lineup_rows:
         t = lineups.setdefault(r.team_id, {
             "team_id": r.team_id, "team_name": r.team_name,

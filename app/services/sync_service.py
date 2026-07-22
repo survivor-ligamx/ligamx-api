@@ -27,7 +27,7 @@ def _validate_season(detected_tournament: str, detected_year: int):
     exp_tournament, exp_year = current_tournament()
     if os.getenv("EXPECTED_SEASON_YEAR"):
         try:
-            exp_year = int(os.getenv("EXPECTED_SEASON_YEAR"))
+            exp_year = int(os.getenv("EXPECTED_SEASON_YEAR"))  # type: ignore[arg-type]
         except ValueError:
             logger.warning("EXPECTED_SEASON_YEAR no es un entero valido; se ignora")
     if os.getenv("EXPECTED_TOURNAMENT"):
@@ -62,7 +62,7 @@ def calculate_week_numbers(matches: List[Dict[str, Any]]):
 
     matches_with_date.sort(key=lambda m: m["match_date"])
 
-    groups = {}
+    groups: dict[str, Any] = {}
     for m in matches_with_date:
         ws = week_start(m["match_date"])
         groups.setdefault(ws, []).append(m)
@@ -81,7 +81,7 @@ def compute_standings_from_matches(matches):
     la tabla 'por ano' de ESPN (que mezcla los dos torneos), reconstruimos la
     clasificacion real del torneo desde sus propios resultados.
     Orden: puntos, luego diferencia de goles, luego goles a favor."""
-    agg = {}
+    agg: dict[str, Any] = {}
 
     def row(name):
         return agg.setdefault(name, {

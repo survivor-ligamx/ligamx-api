@@ -11,7 +11,7 @@ Fuentes:
 """
 from datetime import datetime
 from time import mktime
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
 
 import feedparser
@@ -43,16 +43,16 @@ def _clean(text: str) -> str:
     return " ".join(text.split()).strip()
 
 
-def _entry_image(entry) -> str:
+def _entry_image(entry) -> Optional[str]:
     """Mejor esfuerzo para sacar la miniatura de una entrada RSS."""
     media = entry.get("media_thumbnail") or entry.get("media_content")
     if isinstance(media, list) and media:
         url = media[0].get("url")
         if url:
-            return url
+            return url  # type: ignore[no-any-return]
     for link in entry.get("links", []) or []:
         if link.get("rel") == "enclosure" and str(link.get("type", "")).startswith("image"):
-            return link.get("href")
+            return link.get("href")  # type: ignore[no-any-return]
     return None
 
 

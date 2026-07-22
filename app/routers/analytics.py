@@ -33,7 +33,7 @@ def _player_season_agg(db: Session, player, label: str) -> dict:
         rows = db.query(M).filter(M.season == label, M.player_id == player.external_365_id).all()
     if not rows:
         nq = _norm(player.name)
-        rows = [r for r in db.query(M).filter(M.season == label).all() if _norm(r.player_name or "") == nq]
+        rows = [r for r in db.query(M).filter(M.season == label).all() if _norm(r.player_name or "") == nq]  # type: ignore[arg-type]
     ratings = [r.rating for r in rows if r.rating is not None]
 
     def s(attr):
@@ -111,7 +111,7 @@ def predict_match(home: int = Query(..., description="team_id local"),
         raise HTTPException(status_code=400, detail="No hay suficientes partidos jugados en la temporada para predecir")
 
     by_team = {s.team_id: s for s in played}
-    sh, sa = by_team.get(home), by_team.get(away)
+    sh, sa = by_team.get(home), by_team.get(away)  # type: ignore[call-overload]
     if not sh or not sa:
         raise HTTPException(status_code=400, detail="Alguno de los equipos no tiene partidos jugados en esta temporada")
 
@@ -185,7 +185,7 @@ def power_ranking(season: str = Query(None), db: Session = Depends(get_db)):
         played = s.played or 0
         ppg = s.points / played if played else 0.0
         gdpg = s.goal_difference / played if played else 0.0
-        rating = round(min(100, max(0, (ppg / 3) * 70 + ((gdpg + 3) / 6) * 30)), 1)
+        rating = round(min(100, max(0, (ppg / 3) * 70 + ((gdpg + 3) / 6) * 30)), 1)  # type: ignore[type-var]
         out.append({
             "team": {"id": s.team_id, "name": s.team.name if s.team else None,
                      "logo_url": s.team.logo_url if s.team else None},
@@ -196,7 +196,7 @@ def power_ranking(season: str = Query(None), db: Session = Depends(get_db)):
             "xg": round(xg_by_team.get(s.team_id, 0.0), 2),
             "table_position": s.position,
         })
-    out.sort(key=lambda r: r["rating"], reverse=True)
+    out.sort(key=lambda r: r["rating"], reverse=True)  # type: ignore[arg-type, return-value]
     for i, r in enumerate(out):
         r["rank"] = i + 1
     return {

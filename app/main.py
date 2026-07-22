@@ -81,7 +81,7 @@ app = FastAPI(
 # Rate limiting por IP (slowapi). El limite por defecto aplica a todas las rutas;
 # los endpoints sensibles (sync) anaden un limite mas estricto.
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.add_middleware(SlowAPIMiddleware)
 
 

@@ -10,7 +10,7 @@ Competencia Liga MX = 141.
 import time
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Optional, Dict, List, Any
 import requests
 
 from app.scrapers.base import BaseScraper
@@ -86,16 +86,16 @@ class Scores365Scraper(BaseScraper):
     def source_name(self) -> str:
         return "365scores"
 
-    def _get_json(self, path: str, params: Dict = None, retries: int = 3) -> Dict:
+    def _get_json(self, path: str, params: Optional[Dict] = None, retries: int = 3) -> Dict:
         url = f"{BASE}/{path.lstrip('/')}"
         merged = dict(COMMON_PARAMS)
         if params:
             merged.update(params)
         for attempt in range(retries):
             try:
-                r = requests.get(url, headers=self._headers, params=merged, timeout=20)
+                r = requests.get(url, headers=self._headers, params=merged, timeout=20)  # type: ignore[arg-type]
                 r.raise_for_status()
-                return r.json()
+                return r.json()  # type: ignore[no-any-return]
             except Exception as e:
                 logger.warning(f"365scores request fallo ({attempt+1}/{retries}): {url} - {e}")
                 if attempt == retries - 1:
@@ -166,7 +166,7 @@ class Scores365Scraper(BaseScraper):
             logger.warning(f"365scores stadiums fallo: {e}")
         return list(stadiums.values())
 
-    def get_players(self, competitor_ids: List[int] = None) -> List[Dict]:
+    def get_players(self, competitor_ids: Optional[List[int]] = None) -> List[Dict]:
         # 365Scores no expone un endpoint de plantilla estable (404/500),
         # por lo que los rosters se obtienen de ESPN. Se devuelve vacio para
         # no bloquear el sync. (Los jugadores que SI aporta 365Scores salen
@@ -174,7 +174,7 @@ class Scores365Scraper(BaseScraper):
         logger.info("365scores get_players: rosters no disponibles via API; usar ESPN")
         return []
 
-    def get_matches(self, season_id: int = None) -> List[Dict]:
+    def get_matches(self, season_id: Optional[int] = None) -> List[Dict]:
         # Detecta la temporada vigente (seasonNum mas frecuente en fixtures)
         # para NO mezclar torneos (ej. Clausura vs Apertura).
         current_season = season_id
@@ -226,14 +226,14 @@ class Scores365Scraper(BaseScraper):
 
     # ---------- Detalle por partido ----------
     def _game_raw(self, game_id) -> Dict:
-        return self._get_json("game/", {"gameId": game_id}).get("game", {})
+        return self._get_json("game/", {"gameId": game_id}).get("game", {})  # type: ignore[no-any-return]
 
     def get_game(self, game_id) -> Dict:
         """Detalle crudo del partido (un request). Util para extraer en una sola
         llamada el arbitro, las alineaciones, eventos y las stats por jugador."""
         return self._game_raw(game_id)
 
-    def get_match_info(self, game_id, game: Dict = None) -> Dict:
+    def get_match_info(self, game_id, game: Optional[Dict] = None) -> Dict:
         """Ficha del partido: sede (estadio), arbitro y cuerpo arbitral,
         marcador, estado, jornada y temporada. El arbitro (officials) es un
         dato que ESPN no expone y suele interesar mucho a los aficionados.
@@ -253,8 +253,8 @@ class Scores365Scraper(BaseScraper):
             "game_id": game_id,
             "home_team": home.get("name"),
             "away_team": away.get("name"),
-            "home_score": home.get("score") if isinstance(home.get("score"), (int, float)) and home.get("score") >= 0 else None,
-            "away_score": away.get("score") if isinstance(away.get("score"), (int, float)) and away.get("score") >= 0 else None,
+            "home_score": home.get("score") if isinstance(home.get("score"), (int, float)) and home.get("score") >= 0 else None,  # type: ignore[operator]
+            "away_score": away.get("score") if isinstance(away.get("score"), (int, float)) and away.get("score") >= 0 else None,  # type: ignore[operator]
             "status": _status_from_group(game),
             "start_time": game.get("startTime"),
             "round": game.get("roundNum"),
@@ -296,7 +296,7 @@ class Scores365Scraper(BaseScraper):
             })
         return {"game_id": game_id, "teams": teams}
 
-    def get_probable_lineup(self, game_id, game: Dict = None) -> Dict:
+    def get_probable_lineup(self, game_id, game: Optional[Dict] = None) -> Dict:
         """XI PROBABLE (esperado) que publica 365Scores ANTES del confirmado.
 
         365Scores marca la alineacion con `lineups.status`:
@@ -373,7 +373,7 @@ class Scores365Scraper(BaseScraper):
         for e in game.get("events", []):
             et = e.get("eventType", {}) or {}
             events.append({
-                "category": cat_map.get(et.get("id"), "other"),
+                "category": cat_map.get(et.get("id"), "other"),  # type: ignore[arg-type]
                 "type": et.get("name"),
                 "subtype": et.get("subTypeName"),
                 "minute": e.get("gameTimeDisplay") or (f"{int(e['gameTime'])}'" if e.get("gameTime") else None),
@@ -388,7 +388,7 @@ class Scores365Scraper(BaseScraper):
                 if e["category"] in ("yellow_card", "red_card")]
 
     # ---------- Joyitas: estadisticas por jugador ----------
-    def get_match_player_stats(self, game_id, game: Dict = None) -> Dict:
+    def get_match_player_stats(self, game_id, game: Optional[Dict] = None) -> Dict:
         """Estadisticas COMPLETAS por jugador en un partido: minutos, goles,
         asistencias, xG, xA, remates, pases completados, regates, duelos,
         intercepciones, toques, rating (ranking)... para TODOS los jugadores
@@ -451,7 +451,7 @@ class Scores365Scraper(BaseScraper):
             out.append({"category_id": c.get("id"), "category": c.get("name"), "leaders": rows})
         return out
 
-    def get_player_season_leaders(self, category_id: int = None) -> List[Dict]:
+    def get_player_season_leaders(self, category_id: Optional[int] = None) -> List[Dict]:
         """Lideres de temporada por jugador en 16 categorias: goles, goles
         esperados (xG), asistencias, xA, goles+asistencias, penales, barridas,
         intercepciones, tarjetas rojas/amarillas, valla invicta, goles recibidos,
@@ -461,7 +461,7 @@ class Scores365Scraper(BaseScraper):
             leaders = [c for c in leaders if c.get("category_id") == category_id]
         return leaders
 
-    def get_team_season_leaders(self, category_id: int = None) -> List[Dict]:
+    def get_team_season_leaders(self, category_id: Optional[int] = None) -> List[Dict]:
         """Lideres de temporada por equipo (goles, posesion, etc.)."""
         leaders = self._season_leaders("competitorsStats")
         if category_id is not None:
@@ -469,7 +469,7 @@ class Scores365Scraper(BaseScraper):
         return leaders
 
 
-    def get_match_shots(self, game_id, game: Dict = None) -> Dict:
+    def get_match_shots(self, game_id, game: Optional[Dict] = None) -> Dict:
         """Mapa de tiros con xG del partido (de chartEvents): cada disparo con su
         xG, xGoT, parte del cuerpo, resultado (gol/atajado/fuera/bloqueado),
         minuto, jugador y coordenadas en cancha. Incluye totales de xG por equipo.
@@ -534,7 +534,7 @@ class Scores365Scraper(BaseScraper):
             "shots": shots,
         }
 
-    def get_match_top_performers(self, game_id, game: Dict = None) -> Dict:
+    def get_match_top_performers(self, game_id, game: Optional[Dict] = None) -> Dict:
         """Mejores jugadores del partido por posicion (delantero/mediocampista/
         defensor), con sus stats destacadas, para local y visitante."""
         game = game if game is not None else self._game_raw(game_id)
@@ -587,7 +587,7 @@ class Scores365Scraper(BaseScraper):
         las categorias de arquero en una sola fila por jugador."""
         data = self._get_json("stats/", {"competitions": COMPETITION_ID}).get("stats", {})
         cat_map = {13: "clean_sheets", 14: "goals_conceded", 15: "saves", 16: "penalties_saved"}
-        gks = {}
+        gks: dict[Any, Any] = {}
         for c in data.get("athletesStats", []) or []:
             key = cat_map.get(c.get("id"))
             if not key:
@@ -614,7 +614,7 @@ class Scores365Scraper(BaseScraper):
         out.sort(key=lambda g: _cs(g.get("clean_sheets")), reverse=True)
         return out
 
-    def get_transfers(self, status: str = None, year: int = None) -> Dict:
+    def get_transfers(self, status: Optional[str] = None, year: Optional[int] = None) -> Dict:
         """Mercado de fichajes de Liga MX desde 365Scores, agrupado por equipo.
 
         Devuelve, por cada equipo de Liga MX, sus `altas` (jugadores que ENTRAN)
@@ -653,7 +653,7 @@ class Scores365Scraper(BaseScraper):
         def _team_name(tid):
             c = competitors.get(tid) or {}
             raw = c.get("name")
-            return LIGAMX_TEAM_NAME_MAP.get(raw, raw)
+            return LIGAMX_TEAM_NAME_MAP.get(raw, raw)  # type: ignore[arg-type]
 
         def _tipo(t):
             price = (t.get("price") or "").lower()
@@ -661,7 +661,7 @@ class Scores365Scraper(BaseScraper):
                 return "loan"
             return "transfer"
 
-        equipos = {}
+        equipos: dict[str, Any] = {}
 
         def _bucket(team_name):
             return equipos.setdefault(team_name, {"altas": [], "bajas": []})
@@ -695,7 +695,7 @@ class Scores365Scraper(BaseScraper):
         equipos = {k: equipos[k] for k in sorted(equipos)}
         return {"season": season, "disponible": bool(equipos), "equipos": equipos}
 
-    def get_match_heatmaps(self, game_id, game: Dict = None) -> Dict:
+    def get_match_heatmaps(self, game_id, game: Optional[Dict] = None) -> Dict:
         """Mapas de calor (heatmap) por jugador del partido: URL de imagen lista
         para mostrar, por cada jugador de la alineacion que tenga datos."""
         game = game if game is not None else self._game_raw(game_id)

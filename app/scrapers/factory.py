@@ -5,4 +5,4 @@ SCRAPERS = {"demo": DemoScraper, "espn": ESPNRequestsScraper, "365scores": Score
 def get_scraper(source: str = "demo"):
     if source not in SCRAPERS:
         raise ValueError(f"Fuente no soportada: {source}. Disponibles: {list(SCRAPERS.keys())}")
-    return SCRAPERS[source]()
+    return SCRAPERS[source]()  # type: ignore[abstract]

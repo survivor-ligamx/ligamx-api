@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Optional, Dict, List
 
 class BaseScraper(ABC):
     """Clase base para todos los scrapers. 
@@ -15,7 +15,7 @@ class BaseScraper(ABC):
         pass
     
     @abstractmethod
-    def get_matches(self, season_id: int = None) -> List[Dict]:
+    def get_matches(self, season_id: Optional[int] = None) -> List[Dict]:
         pass
     
     @abstractmethod

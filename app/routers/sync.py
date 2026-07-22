@@ -73,7 +73,7 @@ def link_player_365(
     player = db.query(models.Player).filter(models.Player.id == player_id).first()
     if not player:
         raise HTTPException(status_code=404, detail="Jugador no encontrado")
-    player.external_365_id = external_365_id
+    player.external_365_id = external_365_id  # type: ignore[assignment]
     db.add(player)
     db.commit()
     return {

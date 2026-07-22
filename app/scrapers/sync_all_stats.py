@@ -1,4 +1,5 @@
 import time
+from typing import Any
 from app import models
 
 def sync_all_stats(db, matches, scraper, tmap, season=None):
@@ -9,7 +10,10 @@ def sync_all_stats(db, matches, scraper, tmap, season=None):
     db.query(models.MatchStat).filter(models.MatchStat.season == season).delete()
     db.query(models.PlayerStat).filter(models.PlayerStat.season == season).delete()
     pids = {p.id for p in db.query(models.Player).all()}
-    scorers, ms, ps, seen = {}, [], {}, {}
+    scorers: dict[str, Any] = {}
+    ms: list[Any] = []
+    ps: dict[str, Any] = {}
+    seen: dict[str, Any] = {}
 
     def num(v):
         if v is None: return None
@@ -29,8 +33,8 @@ def sync_all_stats(db, matches, scraper, tmap, season=None):
             db.add(models.Player(id=ip, name=name, team_id=tid))
             pids.add(ip)
         key = (name, ip)
-        seen.setdefault(key, set()).add(eid)
-        ps.setdefault(key, {"player_id": ip, "player_name": name, "team_id": tid, "team_name": tname, "season": season, "goals": 0, "assists": 0, "yellow_cards": 0, "red_cards": 0})[field] += 1
+        seen.setdefault(key, set()).add(eid)  # type: ignore[call-overload]
+        ps.setdefault(key, {"player_id": ip, "player_name": name, "team_id": tid, "team_name": tname, "season": season, "goals": 0, "assists": 0, "yellow_cards": 0, "red_cards": 0})[field] += 1  # type: ignore[call-overload]
 
     for m in matches:
         if m.get("status") != "finished": continue
@@ -65,8 +69,8 @@ def sync_all_stats(db, matches, scraper, tmap, season=None):
                     scorer = parts[0].get("athlete", {})
                     sname = scorer.get("displayName")
                     if sname:
-                        scorers[(sname, tname)] = scorers.get((sname, tname), {"player": sname, "team": tname, "goals": 0, "season": season})
-                        scorers[(sname, tname)]["goals"] += 1
+                        scorers[(sname, tname)] = scorers.get((sname, tname), {"player": sname, "team": tname, "goals": 0, "season": season})  # type: ignore[call-overload, index]
+                        scorers[(sname, tname)]["goals"] += 1  # type: ignore[index]
                 for i, part in enumerate(parts):
                     if not part: continue
                     ath = part.get("athlete", {})

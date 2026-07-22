@@ -56,7 +56,7 @@ class Metrics:
 
     def reset(self):
         with self._lock:
-            self.__init__()
+            self.__init__()  # type: ignore[misc]
 
 
 metrics = Metrics()

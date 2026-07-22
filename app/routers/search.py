@@ -31,18 +31,18 @@ def search(
 
     teams = [
         t for t in db.query(models.Team).all()
-        if nq in _norm(t.name) or nq in _norm(t.short_name or "")
+        if nq in _norm(t.name) or nq in _norm(t.short_name or "")  # type: ignore[arg-type]
     ]
-    teams.sort(key=lambda t: (_rank(t.name, nq), _norm(t.name)))
+    teams.sort(key=lambda t: (_rank(t.name, nq), _norm(t.name)))  # type: ignore[arg-type]
 
     players = [
         p for p in db.query(models.Player).options(joinedload(models.Player.team)).all()
-        if nq in _norm(p.name)
+        if nq in _norm(p.name)  # type: ignore[arg-type]
     ]
-    players.sort(key=lambda p: (_rank(p.name, nq), _norm(p.name)))
+    players.sort(key=lambda p: (_rank(p.name, nq), _norm(p.name)))  # type: ignore[arg-type]
 
-    stadiums = [s for s in db.query(models.Stadium).all() if nq in _norm(s.name)]
-    stadiums.sort(key=lambda s: (_rank(s.name, nq), _norm(s.name)))
+    stadiums = [s for s in db.query(models.Stadium).all() if nq in _norm(s.name)]  # type: ignore[arg-type]
+    stadiums.sort(key=lambda s: (_rank(s.name, nq), _norm(s.name)))  # type: ignore[arg-type]
 
     team_out = [{
         "id": t.id, "name": t.name, "short_name": t.short_name,
