@@ -68,8 +68,7 @@ def test_sync_requiere_api_key(client):
     # sin header -> 422 (falta X-API-Key)
     assert client.post("/sync", params={"source": "demo"}).status_code == 422
     # key incorrecta -> 403
-    assert client.post("/sync", params={"source": "demo"},
-                       headers={"X-API-Key": "wrong"}).status_code == 403
+    assert client.post("/sync", params={"source": "demo"}, headers={"X-API-Key": "wrong"}).status_code == 403
 
 
 def test_sync_status_sin_datos(client):
@@ -83,7 +82,6 @@ def test_sync_status_sin_datos(client):
     # Conteos presentes y en cero (pretemporada / BD vacia)
     assert r["data_counts"]["teams"] == 0
     assert r["data_counts"]["matches"] == 0
-
 
 
 def test_match_timeline(client, seeded):
@@ -119,11 +117,12 @@ def test_match_full_404(client, seeded):
     assert client.get("/matches/999/full").status_code == 404
 
 
-
 # ---------- Fase C: stats por jugador (365Scores) y arbitros ----------
+
 
 def test_match_full_incluye_referee_y_venue(client, seeded, db):
     from app import models
+
     m = db.get(models.Match, 1)
     m.referee = "César Ramos"
     db.commit()
@@ -134,11 +133,9 @@ def test_match_full_incluye_referee_y_venue(client, seeded, db):
 
 def test_365_player_leaders(client, monkeypatch):
     from app.scrapers import scores365_scraper
-    fake = [{"category_id": 1, "category": "Goles",
-             "leaders": [{"rank": 1, "name": "Paulinho", "value": "14", "team_id": 2078}]}]
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper,
-                        "get_player_season_leaders",
-                        lambda self, category_id=None: fake)
+
+    fake = [{"category_id": 1, "category": "Goles", "leaders": [{"rank": 1, "name": "Paulinho", "value": "14", "team_id": 2078}]}]
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_player_season_leaders", lambda self, category_id=None: fake)
     r = client.get("/365scores/leaders")
     assert r.status_code == 200
     body = r.json()
@@ -148,14 +145,18 @@ def test_365_player_leaders(client, monkeypatch):
 
 def test_365_match_player_stats(client, monkeypatch):
     from app.scrapers import scores365_scraper
-    fake = {"game_id": 123, "teams": [{
-        "team_name": "Pumas", "formation": "4-3-3",
-        "players": [{"name": "Carrasquilla", "rating": 6.8,
-                     "stats": {"Minutes": "90'", "Total Remates": "3"}}],
-    }]}
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper,
-                        "get_match_player_stats",
-                        lambda self, game_id: fake)
+
+    fake = {
+        "game_id": 123,
+        "teams": [
+            {
+                "team_name": "Pumas",
+                "formation": "4-3-3",
+                "players": [{"name": "Carrasquilla", "rating": 6.8, "stats": {"Minutes": "90'", "Total Remates": "3"}}],
+            }
+        ],
+    }
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_player_stats", lambda self, game_id: fake)
     r = client.get("/365scores/matches/123/player-stats")
     assert r.status_code == 200
     body = r.json()
@@ -163,11 +164,12 @@ def test_365_match_player_stats(client, monkeypatch):
     assert body["teams"][0]["players"][0]["stats"]["Minutes"] == "90'"
 
 
-
 # ---------- Fase D: stats por jugador persistidas en BD ----------
+
 
 def test_stat_parsers():
     from app.services.sync_service import _stat_int, _stat_float, _stat_fraction
+
     assert _stat_int("58'") == 58
     assert _stat_int("0") == 0
     assert _stat_int(None) is None
@@ -180,13 +182,29 @@ def test_stat_parsers():
 
 def _seed_player_match_stats(db):
     from app import models
-    db.add(models.PlayerMatchStat(
-        match_id=1, player_id=999, player_name="Henry Martín", team_id=1, team_name="América",
-        season="Apertura 2026", starter=1, minutes=90, goals=2, assists=1, shots=4, xg=1.2, xa=0.3,
-        touches=60, interceptions=1, rating=8.5, stats={"Toques": "60"}))
-    db.add(models.PlayerMatchStat(
-        match_id=1, player_id=998, player_name="Rival X", team_id=2, team_name="Chivas",
-        season="Apertura 2026", starter=1, minutes=90, goals=0, assists=0, rating=6.1))
+
+    db.add(
+        models.PlayerMatchStat(
+            match_id=1,
+            player_id=999,
+            player_name="Henry Martín",
+            team_id=1,
+            team_name="América",
+            season="Apertura 2026",
+            starter=1,
+            minutes=90,
+            goals=2,
+            assists=1,
+            shots=4,
+            xg=1.2,
+            xa=0.3,
+            touches=60,
+            interceptions=1,
+            rating=8.5,
+            stats={"Toques": "60"},
+        )
+    )
+    db.add(models.PlayerMatchStat(match_id=1, player_id=998, player_name="Rival X", team_id=2, team_name="Chivas", season="Apertura 2026", starter=1, minutes=90, goals=0, assists=0, rating=6.1))
     db.commit()
 
 
@@ -223,49 +241,200 @@ def test_players_season_leaders(client, seeded, db):
     assert r2[0]["player"] == "Henry Martín" and r2[0]["value"] == 8.5
 
 
-
 # ---------- Histórico multi-temporada ----------
 
-def _season_payload():
+
+def _season_payload(event_id="E1", match_date=None):
     from datetime import datetime
+
     return dict(
         stadiums=[{"name": "Azteca", "city": "CDMX"}],
         teams=[{"id": 1, "name": "América"}, {"id": 2, "name": "Chivas"}],
         players=[{"id": 10, "name": "Henry Martín", "team_name": "América"}],
-        matches=[{"home_team": "América", "away_team": "Chivas", "home_team_id": 1,
-                  "away_team_id": 2, "status": "finished", "home_score": 1, "away_score": 0,
-                  "match_date": datetime(2025, 8, 1), "event_id": "E1"}],
-        standings=[{"team_name": "América", "position": 1, "played": 1, "won": 1, "drawn": 0,
-                    "lost": 0, "goals_for": 1, "goals_against": 0, "points": 3}],
+        matches=[
+            {
+                "home_team": "América",
+                "away_team": "Chivas",
+                "home_team_id": 1,
+                "away_team_id": 2,
+                "status": "finished",
+                "home_score": 1,
+                "away_score": 0,
+                "match_date": match_date or datetime(2025, 8, 1),
+                "event_id": event_id,
+            }
+        ],
+        standings=[{"team_name": "América", "position": 1, "played": 1, "won": 1, "drawn": 0, "lost": 0, "goals_for": 1, "goals_against": 0, "points": 3}],
     )
 
 
 def test_write_season_data_no_destructivo(db):
     from app import models
     from app.services.sync_service import _write_season_data
-    # Dos torneos del MISMO año deben coexistir (clave = etiqueta, no solo año)
-    _write_season_data(db, tournament="Clausura", year=2026, **_season_payload())
+
+    # Dos torneos del MISMO año deben coexistir (los event IDs de ESPN son globales).
+    _write_season_data(
+        db,
+        tournament="Clausura",
+        year=2026,
+        **_season_payload(event_id="C2026-E1"),
+    )
     db.commit()
-    _write_season_data(db, tournament="Apertura", year=2026, **_season_payload())
+    _write_season_data(
+        db,
+        tournament="Apertura",
+        year=2026,
+        **_season_payload(event_id="A2026-E1"),
+    )
     db.commit()
     assert db.query(models.Season).count() == 2
     assert db.query(models.Match).count() == 2
     assert db.query(models.Team).count() == 2
     assert db.query(models.Player).count() == 1  # upsert por id, no duplica
-    # Re-sincronizar un torneo NO duplica ni borra el otro
-    _write_season_data(db, tournament="Clausura", year=2026, **_season_payload())
+    # Re-sincronizar un torneo NO duplica ni borra el otro.
+    _write_season_data(
+        db,
+        tournament="Clausura",
+        year=2026,
+        **_season_payload(event_id="C2026-E1"),
+    )
     db.commit()
     assert db.query(models.Season).count() == 2
     assert db.query(models.Match).count() == 2
     assert db.query(models.Team).count() == 2
 
 
+def test_write_season_data_conserva_identidad_y_relaciones(db):
+    from datetime import datetime
+
+    from app import models
+    from app.services.sync_service import _write_season_data
+
+    payload = _season_payload(event_id="ESPN-STABLE-1")
+    _write_season_data(db, tournament="Apertura", year=2026, **payload)
+    db.commit()
+    original = db.query(models.Match).filter_by(espn_event_id="ESPN-STABLE-1").one()
+    original_id = original.id
+    db.add(
+        models.MatchEvent(
+            match_id=original_id,
+            event_type="goal",
+            event_time=10,
+            player_name="Henry Martín",
+        )
+    )
+    db.commit()
+
+    payload["matches"][0].update(
+        home_score=3,
+        match_date=datetime(2026, 8, 2, 1, 30),
+    )
+    _write_season_data(db, tournament="Apertura", year=2026, **payload)
+    db.commit()
+
+    refreshed = db.query(models.Match).filter_by(espn_event_id="ESPN-STABLE-1").one()
+    assert refreshed.id == original_id
+    assert refreshed.home_score == 3
+    assert refreshed.match_date == datetime(2026, 8, 2, 1, 30)
+    assert db.query(models.MatchEvent).filter_by(match_id=original_id).count() == 1
+
+
+def test_ids_de_otro_proveedor_no_colisionan_con_espn(db):
+    from datetime import datetime
+
+    from app import models
+    from app.services.sync_service import _write_season_data
+
+    _write_season_data(
+        db,
+        tournament="Apertura",
+        year=2025,
+        source="espn",
+        **_season_payload(event_id="123", match_date=datetime(2025, 8, 1)),
+    )
+    db.commit()
+    espn_match = db.query(models.Match).filter_by(espn_event_id="123").one()
+    espn_match_id = espn_match.id
+
+    _write_season_data(
+        db,
+        tournament="Clausura",
+        year=2026,
+        source="365scores",
+        **_season_payload(event_id="123", match_date=datetime(2026, 1, 10)),
+    )
+    db.commit()
+
+    assert db.query(models.Match).count() == 2
+    preserved = db.get(models.Match, espn_match_id)
+    assert preserved.espn_event_id == "123"
+    assert preserved.season.name == "Apertura 2025"
+    other = db.query(models.Match).filter(models.Match.id != espn_match_id).one()
+    assert other.espn_event_id is None
+
+
+def test_fallo_de_detalle_conserva_eventos_y_alineaciones(db, seeded):
+    from app import models
+    from app.services.sync_service import _sync_events_and_lineups
+
+    class FailingDetailScraper:
+        def get_match_events(self, event_id):
+            raise RuntimeError("fuente temporalmente no disponible")
+
+        def get_match_lineups(self, event_id):
+            raise RuntimeError("fuente temporalmente no disponible")
+
+    _sync_events_and_lineups(
+        db,
+        FailingDetailScraper(),
+        {"ESP1": {"match_id": 1, "home": "América", "away": "Chivas"}},
+        {"América": 1, "Chivas": 2},
+    )
+
+    assert db.query(models.MatchEvent).filter_by(match_id=1).count() == 2
+    assert db.query(models.MatchLineup).filter_by(match_id=1).count() == 1
+
+
+def test_snapshot_parcial_no_elimina_partidos_ni_hijos(db):
+    from datetime import datetime
+
+    from app import models
+    from app.services.sync_service import _write_season_data
+
+    complete = _season_payload(event_id="KEEP-1")
+    complete["matches"].append(
+        {
+            "home_team": "Chivas",
+            "away_team": "América",
+            "home_team_id": 2,
+            "away_team_id": 1,
+            "status": "scheduled",
+            "home_score": None,
+            "away_score": None,
+            "match_date": datetime(2025, 8, 8),
+            "event_id": "KEEP-2",
+        }
+    )
+    _write_season_data(db, tournament="Apertura", year=2025, **complete)
+    db.commit()
+    missing = db.query(models.Match).filter_by(espn_event_id="KEEP-2").one()
+    db.add(models.MatchEvent(match_id=missing.id, event_type="other"))
+    db.commit()
+
+    partial = _season_payload(event_id="KEEP-1")
+    _write_season_data(db, tournament="Apertura", year=2025, **partial)
+    db.commit()
+
+    assert db.query(models.Match).filter_by(season_id=missing.season_id).count() == 2
+    assert db.query(models.MatchEvent).filter_by(match_id=missing.id).count() == 1
+
+
 def test_seasons_y_standings_por_temporada(client, seeded, db):
     from app import models
+
     db.add(models.Season(id=2, name="Clausura 2026", year=2026, tournament_type="Clausura"))
     db.flush()
-    db.add(models.Standing(season_id=2, team_id=1, position=1, played=1, won=0, drawn=1,
-                           lost=0, goals_for=0, goals_against=0, goal_difference=0, points=1))
+    db.add(models.Standing(season_id=2, team_id=1, position=1, played=1, won=0, drawn=1, lost=0, goals_for=0, goals_against=0, goal_difference=0, points=1))
     db.commit()
     names = {s["name"] for s in client.get("/seasons").json()}
     assert {"Apertura 2026", "Clausura 2026"} <= names
@@ -275,11 +444,12 @@ def test_seasons_y_standings_por_temporada(client, seeded, db):
     assert len(client.get("/standings", params={"season": "Clausura 2026"}).json()) == 1
 
 
-
 # ---------- Backfill de temporadas pasadas ----------
+
 
 def test_compute_standings_from_matches():
     from app.services.sync_service import compute_standings_from_matches
+
     ms = [
         {"status": "finished", "home_team": "A", "away_team": "B", "home_score": 2, "away_score": 0},
         {"status": "finished", "home_team": "B", "away_team": "A", "home_score": 1, "away_score": 1},
@@ -299,18 +469,37 @@ def test_run_backfill_crea_temporada_pasada(db, monkeypatch):
     class _Fake:
         def get_stadiums(self):
             return [{"name": "Azteca", "city": "CDMX"}]
+
         def get_teams(self):
             return [{"id": 1, "name": "América"}, {"id": 2, "name": "Chivas"}]
+
         def get_players(self):
             return [{"id": 10, "name": "Henry Martín", "team_name": "América"}]
+
         def get_matches(self, season_id=None, tournament=None):
             return [
-                {"event_id": "E1", "home_team": "América", "away_team": "Chivas", "home_team_id": 1,
-                 "away_team_id": 2, "home_score": 3, "away_score": 1, "status": "finished",
-                 "match_date": datetime(2025, 8, 1)},
-                {"event_id": "E2", "home_team": "Chivas", "away_team": "América", "home_team_id": 2,
-                 "away_team_id": 1, "home_score": 0, "away_score": 0, "status": "finished",
-                 "match_date": datetime(2025, 8, 8)},
+                {
+                    "event_id": "E1",
+                    "home_team": "América",
+                    "away_team": "Chivas",
+                    "home_team_id": 1,
+                    "away_team_id": 2,
+                    "home_score": 3,
+                    "away_score": 1,
+                    "status": "finished",
+                    "match_date": datetime(2025, 8, 1),
+                },
+                {
+                    "event_id": "E2",
+                    "home_team": "Chivas",
+                    "away_team": "América",
+                    "home_team_id": 2,
+                    "away_team_id": 1,
+                    "home_score": 0,
+                    "away_score": 0,
+                    "status": "finished",
+                    "match_date": datetime(2025, 8, 8),
+                },
             ]
 
     monkeypatch.setattr(sync_service, "get_scraper", lambda source: _Fake())
@@ -318,31 +507,27 @@ def test_run_backfill_crea_temporada_pasada(db, monkeypatch):
     assert res["season"] == "Apertura 2025"
     assert res["finished_matches"] == 2
     assert db.query(models.Season).filter_by(name="Apertura 2025").count() == 1
-    st = (db.query(models.Standing).join(models.Season)
-          .filter(models.Season.name == "Apertura 2025")
-          .order_by(models.Standing.position).all())
+    st = db.query(models.Standing).join(models.Season).filter(models.Season.name == "Apertura 2025").order_by(models.Standing.position).all()
     assert st[0].team.name == "América" and st[0].points == 4  # victoria + empate
     assert st[1].team.name == "Chivas" and st[1].points == 1
 
 
 def test_backfill_valida_torneo(client):
-    r = client.post("/sync/backfill", params={"year": 2025, "tournament": "Liguilla"},
-                    headers={"X-API-Key": "test-key"})
+    r = client.post("/sync/backfill", params={"year": 2025, "tournament": "Liguilla"}, headers={"X-API-Key": "test-key"})
     assert r.status_code == 422
-
 
 
 # ---------- Liguilla: bracket oficial ----------
 
+
 def test_liguilla_bracket(client, db):
     from app import models
+
     db.add(models.Season(id=1, name="Apertura 2026", year=2026, tournament_type="Apertura"))
     db.flush()
     for pos in range(1, 11):
         db.add(models.Team(id=pos, name=f"Equipo {pos}"))
-        db.add(models.Standing(season_id=1, team_id=pos, position=pos, played=17, won=10, drawn=0,
-                               lost=7, goals_for=20, goals_against=10, goal_difference=10,
-                               points=40 - pos))
+        db.add(models.Standing(season_id=1, team_id=pos, position=pos, played=17, won=10, drawn=0, lost=7, goals_for=20, goals_against=10, goal_difference=10, points=40 - pos))
     db.commit()
 
     b = client.get("/liguilla/bracket").json()
@@ -360,8 +545,8 @@ def test_liguilla_bracket(client, db):
     assert qf["C4"]["high_seed"]["position"] == 4 and qf["C4"]["low_seed"]["position"] == 5
 
 
-
 # ---------- Búsqueda global ----------
+
 
 def test_search_global(client, seeded):
     # jugador por nombre (ignora acentos)
@@ -379,6 +564,7 @@ def test_search_global(client, seeded):
 
 def test_search_prefijo_primero(client, seeded, db):
     from app import models
+
     # 'Martín' contiene pero no empieza; 'Mart' como prefijo debe ir antes
     db.add(models.Player(id=11, team_id=1, name="Martina López"))
     db.commit()
@@ -391,8 +577,8 @@ def test_search_requiere_q(client):
     assert client.get("/search").status_code == 422
 
 
-
 # ---------- Seguridad: cabeceras, API key y rate limiting ----------
+
 
 def test_security_headers(client):
     r = client.get("/health")
@@ -432,15 +618,19 @@ def test_rate_limit_devuelve_429():
     assert c.get("/ping").status_code == 429  # tercer request supera 2/minute
 
 
-
 # ---------- Streaming en vivo (SSE) ----------
+
 
 def test_live_stream_sse(client, monkeypatch):
     from app.routers import live
-    monkeypatch.setattr(live, "_live_snapshot", lambda: [
-        {"event_id": "1", "home_team": "América", "away_team": "Chivas",
-         "home_score": 1, "away_score": 0, "status": "live", "clock": "55'"},
-    ])
+
+    monkeypatch.setattr(
+        live,
+        "_live_snapshot",
+        lambda: [
+            {"event_id": "1", "home_team": "América", "away_team": "Chivas", "home_score": 1, "away_score": 0, "status": "live", "clock": "55'"},
+        ],
+    )
     with client.stream("GET", "/live/stream", params={"interval": 1, "max_seconds": 1}) as r:
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/event-stream")
@@ -456,8 +646,8 @@ def test_live_stream_sse(client, monkeypatch):
     assert "event: live" in blob
 
 
-
 # ---------- Versionado /v1 ----------
+
 
 def test_version_endpoint(client):
     r = client.get("/version").json()
@@ -476,8 +666,8 @@ def test_v1_mirrors_root(client, seeded):
     assert client.get("/v1/seasons").status_code == 200
 
 
-
 # ---------- Observabilidad: métricas ----------
+
 
 def test_metrics_endpoint(client, seeded):
     # generamos algo de trafico
@@ -497,6 +687,7 @@ def test_metrics_endpoint(client, seeded):
 
 def test_metrics_cuenta_errores(client):
     from app.metrics import metrics
+
     before = metrics.snapshot()["requests"]["total"]
     client.get("/matches/999999")  # 404
     after = metrics.snapshot()
@@ -504,17 +695,21 @@ def test_metrics_cuenta_errores(client):
     assert after["requests"]["by_class"].get("4xx", 0) >= 1
 
 
-
 # ---------- Joyita: estadísticas de equipo por temporada (ESPN) ----------
+
 
 def test_team_season_stats(client, seeded, monkeypatch):
     from app.scrapers import espn_requests_scraper as espn
-    fake = {"team_id": 1, "season_year": 2025, "categories": {
-        "defensive": {"interceptions": 154.0, "effectiveTackles": 176.0},
-        "goalKeeping": {"cleanSheet": 6.0, "goalsConceded": 23.0},
-    }}
-    monkeypatch.setattr(espn.ESPNRequestsScraper, "get_team_season_stats",
-                        lambda self, team_id, year=None: {**fake, "team_id": team_id, "season_year": year})
+
+    fake = {
+        "team_id": 1,
+        "season_year": 2025,
+        "categories": {
+            "defensive": {"interceptions": 154.0, "effectiveTackles": 176.0},
+            "goalKeeping": {"cleanSheet": 6.0, "goalsConceded": 23.0},
+        },
+    }
+    monkeypatch.setattr(espn.ESPNRequestsScraper, "get_team_season_stats", lambda self, team_id, year=None: {**fake, "team_id": team_id, "season_year": year})
     r = client.get("/teams/1/season-stats", params={"season": "Apertura 2025"}).json()
     assert r["season_year"] == 2025  # ano extraido de la etiqueta
     assert r["categories"]["goalKeeping"]["cleanSheet"] == 6.0
@@ -529,21 +724,33 @@ def test_team_stats_usa_etiqueta_de_temporada(client, seeded):
     assert r["totals"]["shots"] == 12
 
 
-
 # ---------- Joyita: shotmap/xG y top performers (365Scores) ----------
+
 
 def test_365_match_shots(client, monkeypatch):
     from app.scrapers import scores365_scraper
+
     fake = {
-        "game_id": 123, "teams": {"home": "Pumas", "away": "Cruz Azul"},
-        "totals": {"home": {"shots": 8, "xg": 0.53, "xgot": 0.3, "goals": 0},
-                   "away": {"shots": 12, "xg": 0.95, "xgot": 0.7, "goals": 1}},
-        "shots": [{"minute": "6'", "team": "Cruz Azul", "side": "away", "player": "Rotondi",
-                   "xg": 0.03, "xgot": 0.11, "body_part": "Pie izquierdo",
-                   "outcome": "Atajado", "is_goal": False, "x": 47.9, "y": 75.4}],
+        "game_id": 123,
+        "teams": {"home": "Pumas", "away": "Cruz Azul"},
+        "totals": {"home": {"shots": 8, "xg": 0.53, "xgot": 0.3, "goals": 0}, "away": {"shots": 12, "xg": 0.95, "xgot": 0.7, "goals": 1}},
+        "shots": [
+            {
+                "minute": "6'",
+                "team": "Cruz Azul",
+                "side": "away",
+                "player": "Rotondi",
+                "xg": 0.03,
+                "xgot": 0.11,
+                "body_part": "Pie izquierdo",
+                "outcome": "Atajado",
+                "is_goal": False,
+                "x": 47.9,
+                "y": 75.4,
+            }
+        ],
     }
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_shots",
-                        lambda self, game_id: fake)
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_shots", lambda self, game_id: fake)
     r = client.get("/365scores/matches/123/shots").json()
     assert r["totals"]["away"]["xg"] == 0.95
     assert r["shots"][0]["player"] == "Rotondi"
@@ -552,26 +759,31 @@ def test_365_match_shots(client, monkeypatch):
 
 def test_365_top_performers(client, monkeypatch):
     from app.scrapers import scores365_scraper
-    fake = {"game_id": 123, "categories": [
-        {"category": "Delantero",
-         "home": {"player_id": 1, "name": "Morales", "position": "Centro Delantero",
-                  "stats": {"Total Remates": "2"}},
-         "away": {"player_id": 2, "name": "Otro", "position": "Delantero", "stats": {}}},
-    ]}
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_top_performers",
-                        lambda self, game_id: fake)
+
+    fake = {
+        "game_id": 123,
+        "categories": [
+            {
+                "category": "Delantero",
+                "home": {"player_id": 1, "name": "Morales", "position": "Centro Delantero", "stats": {"Total Remates": "2"}},
+                "away": {"player_id": 2, "name": "Otro", "position": "Delantero", "stats": {}},
+            },
+        ],
+    }
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_top_performers", lambda self, game_id: fake)
     r = client.get("/365scores/matches/123/top-performers").json()
     assert r["categories"][0]["category"] == "Delantero"
     assert r["categories"][0]["home"]["name"] == "Morales"
 
 
-
 # ---------- Estadios oficiales 2026 ----------
+
 
 def test_estadios_oficiales_2026():
     from app.scrapers.espn_requests_scraper import STADIUMS
+
     # Renombres oficiales del Apertura 2026
-    assert STADIUMS[227]["name"] == "Estadio Banorte"          # ex Azteca (América)
+    assert STADIUMS[227]["name"] == "Estadio Banorte"  # ex Azteca (América)
     assert STADIUMS[15720]["name"] == "Estadio Libertad Financiera"  # ex Alfonso Lastras (San Luis)
     # No quedaron nombres viejos
     names = {s["name"] for s in STADIUMS.values()}
@@ -579,8 +791,71 @@ def test_estadios_oficiales_2026():
     assert "Estadio Alfonso Lastras" not in names
 
 
-
 # ---------- Calendario, noticias 365 y xG de temporada ----------
+
+
+def test_matches_publican_id_espn_y_kickoff_utc(client, seeded):
+    listed = client.get("/matches").json()[0]
+    detailed = client.get("/matches/1").json()
+    calendar_match = client.get("/calendar").json()["jornadas"][0]["matches"][0]
+    full = client.get("/matches/1/full").json()
+
+    for match in (listed, detailed):
+        assert match["espn_event_id"] == "ESP1"
+        assert match["match_date"].endswith("Z")
+    assert calendar_match["espn_event_id"] == "ESP1"
+    assert calendar_match["date"].endswith("Z")
+    assert full["espn_event_id"] == "ESP1"
+    assert full["match_date"].endswith("Z")
+
+
+def test_filtros_de_temporada_en_partidos(client, seeded, db):
+    from datetime import datetime
+
+    from app import models
+
+    db.add(
+        models.Season(
+            id=2,
+            name="Clausura 2026",
+            year=2026,
+            tournament_type="Clausura",
+        )
+    )
+    db.flush()
+    db.add(
+        models.Match(
+            id=2,
+            season_id=2,
+            home_team_id=1,
+            away_team_id=2,
+            match_date=datetime(2099, 1, 20, 2, 0),
+            week_number=2,
+            status="scheduled",
+            external_event_id="ESP2",
+            espn_event_id="ESP2",
+        )
+    )
+    db.commit()
+
+    # Sin parametro se conserva el historico completo; por ano se usa el torneo
+    # mas reciente de ese ano (Apertura).
+    assert [m["id"] for m in client.get("/matches").json()] == [1, 2]
+    assert [m["id"] for m in client.get("/matches", params={"season": "2026"}).json()] == [1]
+    # La etiqueta exacta selecciona Clausura y una temporada inexistente no filtra mal.
+    clausura = client.get("/matches", params={"season": "Clausura 2026"}).json()
+    assert [m["id"] for m in clausura] == [2]
+    assert client.get("/matches", params={"season": "Apertura 1900"}).json() == []
+
+    calendar = client.get("/calendar", params={"season": "Clausura 2026"}).json()
+    assert calendar["season"] == "Clausura 2026"
+    assert calendar["jornadas"][0]["matches"][0]["id"] == 2
+    assert [m["id"] for m in client.get("/matches/team/1", params={"season": "Clausura 2026"}).json()] == [2]
+    assert [m["id"] for m in client.get("/matches/week/2", params={"season": "Clausura 2026"}).json()] == [2]
+    assert client.get("/weeks").json() == [1, 2]
+    assert client.get("/weeks", params={"season": "Clausura 2026"}).json() == [2]
+    assert [m["id"] for m in client.get("/matches/upcoming", params={"season": "Clausura 2026"}).json()] == [2]
+
 
 def test_calendar(client, seeded):
     r = client.get("/calendar").json()
@@ -596,10 +871,12 @@ def test_calendar(client, seeded):
 
 def test_365_news(client, monkeypatch):
     from app.scrapers import scores365_scraper
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_news",
-                        lambda self, limit=30: [{"id": 1, "title": "Fichaje bomba",
-                                                 "url": "http://x", "image": "http://i",
-                                                 "published_at": "2026-06-30", "is_magazine": False}])
+
+    monkeypatch.setattr(
+        scores365_scraper.Scores365Scraper,
+        "get_news",
+        lambda self, limit=30: [{"id": 1, "title": "Fichaje bomba", "url": "http://x", "image": "http://i", "published_at": "2026-06-30", "is_magazine": False}],
+    )
     r = client.get("/365scores/news").json()
     assert r[0]["title"] == "Fichaje bomba"
 
@@ -613,16 +890,14 @@ def test_xg_performance(client, seeded, db):
     assert top["diff"] == 0.8  # 2 goles - 1.2 xG (sobre-rendimiento)
 
 
-
 # ---------- Noticias con imagen (RSS + 365Scores unificados) ----------
+
 
 def test_news_incluye_imagen(client, db):
     from datetime import datetime
     from app import models
-    db.add(models.News(title="Gol de último minuto", link="http://x/n1",
-                       description="...", source="365Scores",
-                       image_url="http://img/portada.webp",
-                       published_at=datetime(2026, 7, 1)))
+
+    db.add(models.News(title="Gol de último minuto", link="http://x/n1", description="...", source="365Scores", image_url="http://img/portada.webp", published_at=datetime(2026, 7, 1)))
     db.commit()
     r = client.get("/news").json()
     assert r[0]["title"] == "Gol de último minuto"
@@ -630,8 +905,8 @@ def test_news_incluye_imagen(client, db):
     assert r[0]["source"] == "365Scores"
 
 
-
 # ---------- xG por equipo, porteros y heatmaps ----------
+
 
 def test_teams_xg_performance(client, seeded, db):
     _seed_player_match_stats(db)  # Henry (equipo 1): goals=2, xg=1.2
@@ -645,8 +920,8 @@ def test_teams_xg_performance(client, seeded, db):
 
 def test_365_goalkeepers(client, monkeypatch):
     from app.scrapers import scores365_scraper
-    fake = [{"player_id": 1, "name": "Nahuel Guzmán", "team_id": 10,
-             "clean_sheets": "7", "goals_conceded": "8", "saves": "3.1", "penalties_saved": "1/2"}]
+
+    fake = [{"player_id": 1, "name": "Nahuel Guzmán", "team_id": 10, "clean_sheets": "7", "goals_conceded": "8", "saves": "3.1", "penalties_saved": "1/2"}]
     monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_goalkeepers", lambda self: fake)
     r = client.get("/365scores/goalkeepers").json()
     assert r[0]["name"] == "Nahuel Guzmán" and r[0]["clean_sheets"] == "7"
@@ -654,20 +929,19 @@ def test_365_goalkeepers(client, monkeypatch):
 
 def test_365_heatmaps(client, monkeypatch):
     from app.scrapers import scores365_scraper
-    fake = {"game_id": 123, "teams": [{"team_name": "Pumas", "players": [
-        {"player_id": 1, "name": "Carrasquilla", "position": "Mediocampista",
-         "heatmap_url": "https://heatmap.365scores.com/?x=1"}]}]}
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_heatmaps",
-                        lambda self, game_id: fake)
+
+    fake = {"game_id": 123, "teams": [{"team_name": "Pumas", "players": [{"player_id": 1, "name": "Carrasquilla", "position": "Mediocampista", "heatmap_url": "https://heatmap.365scores.com/?x=1"}]}]}
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_heatmaps", lambda self, game_id: fake)
     r = client.get("/365scores/matches/123/heatmaps").json()
     assert r["teams"][0]["players"][0]["heatmap_url"].startswith("https://heatmap")
 
 
-
 # ---------- Analítica: comparador y predictor ----------
+
 
 def test_compare_players(client, seeded, db):
     from app import models
+
     _seed_player_match_stats(db)
     db.add(models.Player(id=11, team_id=2, name="Rival X"))
     db.commit()
@@ -696,6 +970,7 @@ def test_predict_match(client, seeded):
 
 def test_predict_sin_datos(client, db):
     from app import models
+
     db.add(models.Season(id=1, name="Apertura 2026", year=2026, tournament_type="Apertura"))
     db.add(models.Team(id=1, name="A"))
     db.add(models.Team(id=2, name="B"))
@@ -704,8 +979,8 @@ def test_predict_sin_datos(client, db):
     assert client.get("/predict", params={"home": 1, "away": 2}).status_code == 400
 
 
-
 # ---------- Dashboard y readiness ----------
+
 
 def test_dashboard(client, seeded):
     r = client.get("/dashboard").json()
@@ -729,8 +1004,8 @@ def test_health_ready(client):
     assert body["checks"]["redis"] in ("disabled", "ok")
 
 
-
 # ---------- Power ranking y perfiles ----------
+
 
 def test_power_ranking(client, seeded):
     r = client.get("/power-ranking").json()
@@ -761,8 +1036,8 @@ def test_team_profile(client, seeded, db):
     assert "form" in r and "last_result" in r
 
 
-
 # ---------- Jugadores a seguir ----------
+
 
 def test_players_to_watch(client, seeded, db):
     _seed_player_match_stats(db)
@@ -783,16 +1058,15 @@ def test_players_to_watch_sin_datos(client, seeded):
     assert "note" in r
 
 
-
 # ---------- Disciplina: tarjetas acumuladas y suspensiones ----------
+
 
 def _seed_cards(db):
     """Agrega tarjetas al jugador 'Tarjetero' (equipo 1): 4 amarillas (en riesgo)."""
     from app import models
+
     for minute in (10, 20, 30, 40):
-        db.add(models.MatchEvent(match_id=1, event_type="yellow_card", event_time=minute,
-                                 player_name="Tarjetero", team_id=1, team_name="América",
-                                 description="Yellow Card", is_home=1))
+        db.add(models.MatchEvent(match_id=1, event_type="yellow_card", event_time=minute, player_name="Tarjetero", team_id=1, team_name="América", description="Yellow Card", is_home=1))
     db.commit()
 
 
@@ -820,6 +1094,7 @@ def test_players_discipline_at_risk(client, seeded, db):
 
 def test_player_discipline_individual(client, seeded, db):
     from app import models
+
     db.add(models.Player(id=20, team_id=1, name="Tarjetero"))
     _seed_cards(db)
     r = client.get("/players/20/discipline").json()
@@ -840,8 +1115,8 @@ def test_team_discipline(client, seeded, db):
     assert r2["totals"]["yellow_cards"] == 1
 
 
-
 # ---------- Rachas y proyección ----------
+
 
 def test_player_form(client, seeded, db):
     _seed_player_match_stats(db)
@@ -867,6 +1142,7 @@ def test_team_streak(client, seeded):
 def test_standings_projection(client, seeded, db):
     from datetime import datetime
     from app import models
+
     # sin partidos restantes: la proyección iguala los puntos actuales
     r = client.get("/standings/projection").json()
     assert r["season"] == "Apertura 2026"
@@ -874,8 +1150,7 @@ def test_standings_projection(client, seeded, db):
     assert rows[1]["projected_points"] == rows[1]["current_points"]
     assert rows[1]["remaining_matches"] == 0
     # añadimos un partido programado -> ambos equipos suman puntos esperados
-    db.add(models.Match(id=2, season_id=1, home_team_id=1, away_team_id=2,
-                        status="scheduled", match_date=datetime(2026, 8, 1), week_number=2))
+    db.add(models.Match(id=2, season_id=1, home_team_id=1, away_team_id=2, status="scheduled", match_date=datetime(2026, 8, 1), week_number=2))
     db.commit()
     r2 = client.get("/standings/projection").json()
     rows2 = {row["team_id"]: row for row in r2["projected_standings"]}
@@ -886,8 +1161,8 @@ def test_standings_projection(client, seeded, db):
     assert pts == sorted(pts, reverse=True)
 
 
-
 # ---------- Leaderboard unificado ----------
+
 
 def test_leaderboard_rendimiento(client, seeded, db):
     _seed_player_match_stats(db)
@@ -918,11 +1193,12 @@ def test_leaderboard_metrica_invalida_usa_goals(client, seeded, db):
     assert r["metric"] == "goals"  # cae a goals por defecto
 
 
-
 # ---------- Cruce de identidad ESPN <-> 365Scores ----------
+
 
 def test_name_match_score():
     from app.services.player_identity import name_match_score
+
     # igualdad exacta (ignora acentos)
     assert name_match_score("Henry Martín", "Henry Martín") == 1.0
     assert name_match_score("Julian Quinones", "Julián Quiñones") == 1.0
@@ -937,15 +1213,14 @@ def test_name_match_score():
 def test_build_identity_map(db):
     from app import models
     from app.services.player_identity import build_player_identity_map
+
     db.add(models.Team(id=1, name="América"))
     db.add(models.Player(id=10, team_id=1, name="Henry Martín"))
     db.add(models.Player(id=11, team_id=1, name="Julián Quiñones"))
     db.flush()
     # stats de 365Scores: ids propios y nombres distintos (uno abreviado)
-    db.add(models.PlayerMatchStat(match_id=1, player_id=5001, player_name="Henry Martín",
-                                  team_id=1, season="Apertura 2026", goals=1))
-    db.add(models.PlayerMatchStat(match_id=1, player_id=5002, player_name="J. Quiñones",
-                                  team_id=1, season="Apertura 2026", goals=2))
+    db.add(models.PlayerMatchStat(match_id=1, player_id=5001, player_name="Henry Martín", team_id=1, season="Apertura 2026", goals=1))
+    db.add(models.PlayerMatchStat(match_id=1, player_id=5002, player_name="J. Quiñones", team_id=1, season="Apertura 2026", goals=2))
     db.commit()
     res = build_player_identity_map(db, "Apertura 2026")
     assert res["mapped"] == 2 and res["unmatched"] == 0
@@ -957,6 +1232,7 @@ def test_identity_map_homonimos(db):
     # Dos apellidos iguales en el MISMO equipo: se desambiguan por el nombre/inicial
     from app import models
     from app.services.player_identity import build_player_identity_map
+
     db.add(models.Team(id=1, name="América"))
     db.add(models.Player(id=20, team_id=1, name="Luis García"))
     db.add(models.Player(id=21, team_id=1, name="Carlos García"))
@@ -971,6 +1247,7 @@ def test_identity_map_homonimos(db):
 
 def test_identity_map_endpoint(client, seeded, db):
     from app import models
+
     p = db.get(models.Player, 10)
     p.external_365_id = 999
     db.commit()
@@ -983,11 +1260,10 @@ def test_stats_por_id_exacto(client, seeded, db):
     # Jugador 10 mapeado a id 365 = 7777; la fila de stats usa ESE id pero un
     # nombre DISTINTO que NO casaría por nombre -> debe encontrarse por id exacto.
     from app import models
+
     p = db.get(models.Player, 10)
     p.external_365_id = 7777
-    db.add(models.PlayerMatchStat(match_id=1, player_id=7777, player_name="H. Martín (365)",
-                                  team_id=1, team_name="América", season="Apertura 2026",
-                                  minutes=90, goals=3, assists=1, rating=9.0))
+    db.add(models.PlayerMatchStat(match_id=1, player_id=7777, player_name="H. Martín (365)", team_id=1, team_name="América", season="Apertura 2026", minutes=90, goals=3, assists=1, rating=9.0))
     db.commit()
     r = client.get("/players/10/season-stats").json()
     assert r["goals"] == 3 and r["assists"] == 1
@@ -998,11 +1274,12 @@ def test_sync_player_identity_requiere_api_key(client):
     assert client.post("/sync/player-identity", headers={"X-API-Key": "wrong"}).status_code == 403
 
 
-
 # ---------- Bio enriquecida de jugadores ----------
+
 
 def test_player_bio_en_response(client, seeded, db):
     from app import models
+
     p = db.get(models.Player, 10)
     p.nationality = "México"
     p.flag_url = "https://a.espncdn.com/i/teamlogos/countries/500/mex.png"
@@ -1019,6 +1296,7 @@ def test_player_bio_en_response(client, seeded, db):
 def test_player_profile_incluye_edad_y_bio(client, seeded, db):
     _seed_player_match_stats(db)
     from app import models
+
     p = db.get(models.Player, 10)
     p.birth_date = "1992-11-22T08:00Z"
     p.flag_url = "http://flag/mex.png"
@@ -1032,6 +1310,7 @@ def test_player_profile_incluye_edad_y_bio(client, seeded, db):
 
 def test_age_from_birthdate():
     from app.routers.players import _age_from_birthdate
+
     assert _age_from_birthdate("1992-11-22T08:00Z") == 33
     assert _age_from_birthdate("2007-09-05") == 18
     assert _age_from_birthdate(None) is None
@@ -1041,17 +1320,26 @@ def test_age_from_birthdate():
 def test_espn_scraper_nacionalidad_desde_citizenship():
     # Regresión del bug: el roster de ESPN usa 'citizenship', no 'country'
     from app.scrapers.espn_requests_scraper import ESPNRequestsScraper
+
     s = ESPNRequestsScraper()
     s._teams = [{"id": 1, "name": "América"}]
 
     def fake_get_json(url, params=None, retries=3):
-        return {"athletes": [{
-            "id": "555", "displayName": "Jugador Prueba", "jersey": "9",
-            "citizenship": "México", "dateOfBirth": "2000-01-01T08:00Z",
-            "flag": {"href": "http://flag/mex.png"},
-            "displayHeight": "1.80 m", "displayWeight": "76 kg",
-            "position": {"abbreviation": "DEL"},
-        }]}
+        return {
+            "athletes": [
+                {
+                    "id": "555",
+                    "displayName": "Jugador Prueba",
+                    "jersey": "9",
+                    "citizenship": "México",
+                    "dateOfBirth": "2000-01-01T08:00Z",
+                    "flag": {"href": "http://flag/mex.png"},
+                    "displayHeight": "1.80 m",
+                    "displayWeight": "76 kg",
+                    "position": {"abbreviation": "DEL"},
+                }
+            ]
+        }
 
     s._get_json = fake_get_json
     players = s.get_players()
@@ -1063,8 +1351,10 @@ def test_espn_scraper_nacionalidad_desde_citizenship():
 
 # ---------- Liguilla: resultados reales por serie ----------
 
+
 def test_classify_phase():
     from app.routers.standings import _classify_phase
+
     assert _classify_phase("Cuartos de Final", None)[0] == "quarterfinals"
     assert _classify_phase("Semifinal", None)[0] == "semifinals"
     assert _classify_phase("Final", None)[0] == "final"
@@ -1087,36 +1377,33 @@ def test_liguilla_results_sin_fase_final(client, seeded):
 def test_liguilla_results_serie_real(client, seeded, db):
     from datetime import datetime
     from app import models
+
     # Cuartos de final, ida y vuelta entre equipo 1 y 2
-    db.add(models.Match(id=50, season_id=1, home_team_id=1, away_team_id=2,
-                        home_score=3, away_score=1, status="finished",
-                        round_name="Cuartos de Final", match_date=datetime(2026, 11, 20)))
-    db.add(models.Match(id=51, season_id=1, home_team_id=2, away_team_id=1,
-                        home_score=1, away_score=1, status="finished",
-                        round_name="Cuartos de Final", match_date=datetime(2026, 11, 23)))
+    db.add(models.Match(id=50, season_id=1, home_team_id=1, away_team_id=2, home_score=3, away_score=1, status="finished", round_name="Cuartos de Final", match_date=datetime(2026, 11, 20)))
+    db.add(models.Match(id=51, season_id=1, home_team_id=2, away_team_id=1, home_score=1, away_score=1, status="finished", round_name="Cuartos de Final", match_date=datetime(2026, 11, 23)))
     db.commit()
     r = client.get("/liguilla/results").json()
     assert r["has_playoff_data"] is True
     assert r["series_count"] == 1
     serie = r["phases"]["quarterfinals"][0]
     agg = {t["team_id"]: t["aggregate"] for t in serie["teams"]}
-    assert agg[1] == 4 and agg[2] == 2   # 3+1 vs 1+1
+    assert agg[1] == 4 and agg[2] == 2  # 3+1 vs 1+1
     assert serie["winner_team_id"] == 1 and serie["decided"] is True
     assert len(serie["legs"]) == 2
 
 
-
 # ---------- Enlace manual del cruce de identidad ----------
+
 
 def test_build_identity_respeta_enlace_manual(db):
     from app import models
     from app.services.player_identity import build_player_identity_map
+
     db.add(models.Team(id=1, name="América"))
     # 'Chaco' es un apodo que NO casa por nombre con "Diego Valdés"
     db.add(models.Player(id=10, team_id=1, name="Diego Valdés", external_365_id=8001))
     db.flush()
-    db.add(models.PlayerMatchStat(match_id=1, player_id=8001, player_name="Chaco",
-                                  team_id=1, season="Apertura 2026", goals=1))
+    db.add(models.PlayerMatchStat(match_id=1, player_id=8001, player_name="Chaco", team_id=1, season="Apertura 2026", goals=1))
     db.commit()
     res = build_player_identity_map(db, "Apertura 2026")
     # el enlace manual se conserva (no lo pisa ni lo cuenta como nuevo)
@@ -1126,24 +1413,24 @@ def test_build_identity_respeta_enlace_manual(db):
 
 def test_link_365_endpoint(client, seeded, db):
     from app import models
+
     # sin API key -> 422; con key -> enlaza
     assert client.post("/players/10/link-365", params={"external_365_id": 777}).status_code == 422
-    r = client.post("/players/10/link-365", params={"external_365_id": 777},
-                    headers={"X-API-Key": "test-key"})
+    r = client.post("/players/10/link-365", params={"external_365_id": 777}, headers={"X-API-Key": "test-key"})
     assert r.status_code == 200
     assert r.json()["external_365_id"] == 777
     assert db.get(models.Player, 10).external_365_id == 777
     # jugador inexistente -> 404
-    assert client.post("/players/99999/link-365", params={"external_365_id": 1},
-                       headers={"X-API-Key": "test-key"}).status_code == 404
+    assert client.post("/players/99999/link-365", params={"external_365_id": 1}, headers={"X-API-Key": "test-key"}).status_code == 404
 
 
 # ---------- Joyita: link a Google Maps de estadios ----------
 
+
 def test_stadium_maps_url_por_coordenadas(client, db):
     from app import models
-    db.add(models.Stadium(id=5, name="Estadio Banorte", city="CDMX",
-                          capacity=87000, latitude=19.3029, longitude=-99.1505))
+
+    db.add(models.Stadium(id=5, name="Estadio Banorte", city="CDMX", capacity=87000, latitude=19.3029, longitude=-99.1505))
     db.commit()
     r = client.get("/stadiums/5").json()
     assert r["maps_url"] == "https://www.google.com/maps/search/?api=1&query=19.3029,-99.1505"
@@ -1151,6 +1438,7 @@ def test_stadium_maps_url_por_coordenadas(client, db):
 
 def test_stadium_maps_url_por_nombre(client, db):
     from app import models
+
     db.add(models.Stadium(id=6, name="Estadio Akron", city="Zapopan"))
     db.commit()
     r = client.get("/stadiums/6").json()
@@ -1166,17 +1454,17 @@ def test_stadium_maps_url_en_teams(client, seeded):
 
 # ---------- Comparar temporadas ----------
 
+
 def test_seasons_compare(client, seeded, db):
     from datetime import datetime
     from app import models
+
     # segunda temporada con datos propios
     db.add(models.Season(id=2, name="Clausura 2026", year=2026, tournament_type="Clausura"))
     db.flush()
     db.add(models.Team(id=99, name="Equipo Z"))
-    db.add(models.Standing(season_id=2, team_id=99, position=1, played=2, won=2, drawn=0,
-                           lost=0, goals_for=5, goals_against=1, goal_difference=4, points=6))
-    db.add(models.Match(id=70, season_id=2, home_team_id=99, away_team_id=1,
-                        home_score=3, away_score=1, status="finished", match_date=datetime(2026, 1, 15)))
+    db.add(models.Standing(season_id=2, team_id=99, position=1, played=2, won=2, drawn=0, lost=0, goals_for=5, goals_against=1, goal_difference=4, points=6))
+    db.add(models.Match(id=70, season_id=2, home_team_id=99, away_team_id=1, home_score=3, away_score=1, status="finished", match_date=datetime(2026, 1, 15)))
     db.add(models.TopScorer(player="Goleador Z", team="Equipo Z", goals=7, season="Clausura 2026"))
     db.commit()
 
@@ -1213,25 +1501,21 @@ _FAKE_TRANSFERS = {
     ],
     "transfers": [
         # Alta a América desde club extranjero (compra)
-        {"athleteId": 1, "origin": 300, "target": 100, "type": 2,
-         "price": "-", "statusName": "Confirmado", "time": "2026-07-01T10:00:00"},
+        {"athleteId": 1, "origin": 300, "target": 100, "type": 2, "price": "-", "statusName": "Confirmado", "time": "2026-07-01T10:00:00"},
         # Prestamo de América a Chivas: baja para América, alta para Chivas
-        {"athleteId": 2, "origin": 100, "target": 200, "type": 3,
-         "price": "Préstamo", "statusName": "Rumor", "time": "2026-07-02T10:00:00"},
+        {"athleteId": 2, "origin": 100, "target": 200, "type": 3, "price": "Préstamo", "statusName": "Rumor", "time": "2026-07-02T10:00:00"},
         # Renovacion (origin == target): ni alta ni baja
-        {"athleteId": 3, "origin": 100, "target": 100, "type": 8,
-         "price": "Extensión de contrato", "statusName": "Confirmado", "time": "2026-07-03T10:00:00"},
+        {"athleteId": 3, "origin": 100, "target": 100, "type": 8, "price": "Extensión de contrato", "statusName": "Confirmado", "time": "2026-07-03T10:00:00"},
         # Fichaje de otro anio: debe filtrarse por defecto (year actual)
-        {"athleteId": 1, "origin": 200, "target": 300, "type": 2,
-         "price": "-", "statusName": "Confirmado", "time": "2020-01-01T10:00:00"},
+        {"athleteId": 1, "origin": 200, "target": 300, "type": 2, "price": "-", "statusName": "Confirmado", "time": "2020-01-01T10:00:00"},
     ],
 }
 
 
 def _patch_transfers_http(monkeypatch, payload=_FAKE_TRANSFERS):
     from app.scrapers import scores365_scraper
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_get_json",
-                        lambda self, path, params=None, retries=3: payload)
+
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_get_json", lambda self, path, params=None, retries=3: payload)
 
 
 def test_365_transfers_agrupado(client, monkeypatch):
@@ -1284,35 +1568,38 @@ def test_365_transfers_sin_datos(client, monkeypatch):
 
 # ---------- Impacto del XI confirmado (lineup-impact, 365Scores + BD) ----------
 
+
 def _seed_lineup_impact_stats(db):
     """3 jugadores del equipo 1 (América) con produccion conocida (total = 10):
     501 -> 8 (goles+asist), 502 -> 2, 503 -> 0."""
     from app import models
-    db.add(models.PlayerMatchStat(match_id=1, player_id=501, player_name="Estrella",
-                                  team_id=1, team_name="América", season="Apertura 2026",
-                                  goals=5, assists=3))
-    db.add(models.PlayerMatchStat(match_id=1, player_id=502, player_name="Medio",
-                                  team_id=1, team_name="América", season="Apertura 2026",
-                                  goals=1, assists=1))
-    db.add(models.PlayerMatchStat(match_id=1, player_id=503, player_name="Suplente",
-                                  team_id=1, team_name="América", season="Apertura 2026",
-                                  goals=0, assists=0))
+
+    db.add(models.PlayerMatchStat(match_id=1, player_id=501, player_name="Estrella", team_id=1, team_name="América", season="Apertura 2026", goals=5, assists=3))
+    db.add(models.PlayerMatchStat(match_id=1, player_id=502, player_name="Medio", team_id=1, team_name="América", season="Apertura 2026", goals=1, assists=1))
+    db.add(models.PlayerMatchStat(match_id=1, player_id=503, player_name="Suplente", team_id=1, team_name="América", season="Apertura 2026", goals=0, assists=0))
     db.commit()
 
 
 def test_365_lineup_impact(client, seeded, db, monkeypatch):
     from app.scrapers import scores365_scraper
+
     _seed_lineup_impact_stats(db)
     # XI: 502 y 503 arrancan; 501 (el mas importante) esta en la banca.
-    fake = {"game_id": 123, "teams": [
-        {"team_name": "Club América", "home_away": "home", "players": [
-            {"player_id": 501, "name": "Estrella", "starter": False},
-            {"player_id": 502, "name": "Medio", "starter": True},
-            {"player_id": 503, "name": "Suplente", "starter": True},
-        ]},
-    ]}
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_lineups",
-                        lambda self, game_id: fake)
+    fake = {
+        "game_id": 123,
+        "teams": [
+            {
+                "team_name": "Club América",
+                "home_away": "home",
+                "players": [
+                    {"player_id": 501, "name": "Estrella", "starter": False},
+                    {"player_id": 502, "name": "Medio", "starter": True},
+                    {"player_id": 503, "name": "Suplente", "starter": True},
+                ],
+            },
+        ],
+    }
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_lineups", lambda self, game_id: fake)
     r = client.get("/365scores/matches/123/lineup-impact")
     assert r.status_code == 200
     body = r.json()
@@ -1329,12 +1616,15 @@ def test_365_lineup_impact(client, seeded, db, monkeypatch):
 
 def test_365_lineup_impact_sin_xi(client, seeded, monkeypatch):
     from app.scrapers import scores365_scraper
+
     # 365Scores aun no publica el XI (sin titulares) -> no disponible, sin inventar.
-    fake = {"game_id": 123, "teams": [
-        {"team_name": "Club América", "home_away": "home", "players": []},
-    ]}
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_lineups",
-                        lambda self, game_id: fake)
+    fake = {
+        "game_id": 123,
+        "teams": [
+            {"team_name": "Club América", "home_away": "home", "players": []},
+        ],
+    }
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "get_match_lineups", lambda self, game_id: fake)
     body = client.get("/365scores/matches/123/lineup-impact").json()
     assert body["disponible"] is False
     assert body["equipos"] == {}
@@ -1342,14 +1632,17 @@ def test_365_lineup_impact_sin_xi(client, seeded, monkeypatch):
 
 # ---------- Robustez: frescura del sync y verificacion end-to-end del bot ----------
 
+
 def test_sync_status_freshness_fresco(client, db):
     """Con una sync exitosa reciente, freshness.is_stale debe ser False."""
     from datetime import datetime
     from app import models
-    db.add(models.SyncLog(source="espn", status="success", detail="ok",
-                          season="Apertura 2026", teams=18, players=500, matches=153,
-                          started_at=datetime.utcnow(), duration_seconds=42.0,
-                          finished_at=datetime.utcnow()))
+
+    db.add(
+        models.SyncLog(
+            source="espn", status="success", detail="ok", season="Apertura 2026", teams=18, players=500, matches=153, started_at=datetime.utcnow(), duration_seconds=42.0, finished_at=datetime.utcnow()
+        )
+    )
     db.commit()
     r = client.get("/sync/status").json()
     assert r["freshness"]["is_stale"] is False
@@ -1362,17 +1655,17 @@ def test_bot_endpoints_end_to_end(client, seeded, db, monkeypatch):
     responden 200 (con datos reales sembrados o `disponible: false` limpio),
     nunca 500. Las fuentes 365Scores se mockean (sin red)."""
     from app.scrapers import scores365_scraper as s365
+
     _seed_player_match_stats(db)  # Henry (id 999, equipo 1) y Rival X (id 998, equipo 2)
 
     # Mocks de 365Scores (sin red): transfers, porteros y alineaciones.
-    monkeypatch.setattr(s365.Scores365Scraper, "get_transfers",
-                        lambda self, status=None, year=None: {
-                            "season": "Apertura 2026", "disponible": False, "equipos": {}})
+    monkeypatch.setattr(s365.Scores365Scraper, "get_transfers", lambda self, status=None, year=None: {"season": "Apertura 2026", "disponible": False, "equipos": {}})
     monkeypatch.setattr(s365.Scores365Scraper, "get_goalkeepers", lambda self: [])
-    monkeypatch.setattr(s365.Scores365Scraper, "get_match_lineups",
-                        lambda self, game_id: {"game_id": game_id, "teams": [
-                            {"team_name": "América", "home_away": "home", "players": [
-                                {"player_id": 999, "name": "Henry Martín", "starter": True}]}]})
+    monkeypatch.setattr(
+        s365.Scores365Scraper,
+        "get_match_lineups",
+        lambda self, game_id: {"game_id": game_id, "teams": [{"team_name": "América", "home_away": "home", "players": [{"player_id": 999, "name": "Henry Martín", "starter": True}]}]},
+    )
 
     endpoints = [
         "/standings",
@@ -1398,17 +1691,13 @@ def test_bot_endpoints_pretemporada_sin_datos(client, monkeypatch):
     """En pretemporada (BD vacia) los endpoints NO deben dar 500: responden
     vacio o `disponible: false`, sin fabricar datos."""
     from app.scrapers import scores365_scraper as s365
-    monkeypatch.setattr(s365.Scores365Scraper, "get_transfers",
-                        lambda self, status=None, year=None: {
-                            "season": "Apertura 2026", "disponible": False, "equipos": {}})
+
+    monkeypatch.setattr(s365.Scores365Scraper, "get_transfers", lambda self, status=None, year=None: {"season": "Apertura 2026", "disponible": False, "equipos": {}})
     monkeypatch.setattr(s365.Scores365Scraper, "get_goalkeepers", lambda self: [])
-    monkeypatch.setattr(s365.Scores365Scraper, "get_match_lineups",
-                        lambda self, game_id: {"game_id": game_id, "teams": []})
+    monkeypatch.setattr(s365.Scores365Scraper, "get_match_lineups", lambda self, game_id: {"game_id": game_id, "teams": []})
 
     # Endpoints que no dependen de ids sembrados
-    for path in ["/standings", "/calendar", "/365scores/transfers",
-                 "/365scores/goalkeepers", "/players/discipline", "/news",
-                 "/365scores/matches/123/lineup-impact"]:
+    for path in ["/standings", "/calendar", "/365scores/transfers", "/365scores/goalkeepers", "/players/discipline", "/news", "/365scores/matches/123/lineup-impact"]:
         r = client.get(path)
         assert r.status_code < 500, f"{path} devolvio {r.status_code}"
     # lineup-impact sin XI -> disponible false, no inventa
@@ -1417,10 +1706,12 @@ def test_bot_endpoints_pretemporada_sin_datos(client, monkeypatch):
 
 # ---------- H2H agregado en TODAS las temporadas ----------
 
+
 def _seed_two_seasons_h2h(db):
     """2 temporadas con enfrentamientos América(227)–Pachuca(234) en cada una."""
     from datetime import datetime
     from app import models
+
     db.add(models.Season(id=1, name="Apertura 2024", year=2024, tournament_type="Apertura"))
     db.add(models.Season(id=2, name="Clausura 2025", year=2025, tournament_type="Clausura"))
     db.add(models.Team(id=227, name="América"))
@@ -1428,21 +1719,20 @@ def _seed_two_seasons_h2h(db):
     db.flush()
 
     def mk(sid, h, a, hs, as_, d):
-        db.add(models.Match(season_id=sid, home_team_id=h, away_team_id=a,
-                            home_score=hs, away_score=as_, status="finished", match_date=d))
+        db.add(models.Match(season_id=sid, home_team_id=h, away_team_id=a, home_score=hs, away_score=as_, status="finished", match_date=d))
 
-    mk(1, 227, 234, 2, 1, datetime(2024, 8, 1))   # América gana
+    mk(1, 227, 234, 2, 1, datetime(2024, 8, 1))  # América gana
     mk(1, 234, 227, 0, 0, datetime(2024, 11, 1))  # empate
-    mk(2, 227, 234, 3, 0, datetime(2025, 2, 1))   # América gana
-    mk(2, 234, 227, 1, 2, datetime(2025, 4, 1))   # América gana de visita
+    mk(2, 227, 234, 3, 0, datetime(2025, 2, 1))  # América gana
+    mk(2, 234, 227, 1, 2, datetime(2025, 4, 1))  # América gana de visita
     db.commit()
 
 
 def test_h2h_summary_agrega_todas_las_temporadas(client, db):
     _seed_two_seasons_h2h(db)
     r = client.get("/h2h/227/234/summary").json()
-    assert r["played"] == 4                 # antes solo contaba la temporada vigente
-    assert r["team1"]["wins"] == 3          # 3 victorias de América en 2 temporadas
+    assert r["played"] == 4  # antes solo contaba la temporada vigente
+    assert r["team1"]["wins"] == 3  # 3 victorias de América en 2 temporadas
     assert r["team2"]["wins"] == 0
     assert r["draws"] == 1
     assert r["team1"]["goals"] == 7 and r["team2"]["goals"] == 2
@@ -1456,17 +1746,14 @@ def test_h2h_agrega_por_nombre_canonico_ids_duplicados(client, db):
     el H2H debe agregarlos por nombre canonico y no perder partidos."""
     from datetime import datetime
     from app import models
+
     db.add(models.Season(id=1, name="Apertura 2024", year=2024, tournament_type="Apertura"))
     db.add(models.Team(id=227, name="América"))
-    db.add(models.Team(id=9999, name="América"))   # duplicado con otro id
+    db.add(models.Team(id=9999, name="América"))  # duplicado con otro id
     db.add(models.Team(id=234, name="Pachuca"))
     db.flush()
-    db.add(models.Match(season_id=1, home_team_id=227, away_team_id=234,
-                        home_score=1, away_score=0, status="finished",
-                        match_date=datetime(2024, 8, 1)))
-    db.add(models.Match(season_id=1, home_team_id=234, away_team_id=9999,
-                        home_score=2, away_score=2, status="finished",
-                        match_date=datetime(2024, 9, 1)))
+    db.add(models.Match(season_id=1, home_team_id=227, away_team_id=234, home_score=1, away_score=0, status="finished", match_date=datetime(2024, 8, 1)))
+    db.add(models.Match(season_id=1, home_team_id=234, away_team_id=9999, home_score=2, away_score=2, status="finished", match_date=datetime(2024, 9, 1)))
     db.commit()
     # Consultando por el id 227 se incluye tambien el partido del id 9999 (mismo nombre)
     r = client.get("/h2h/227/234/summary").json()
@@ -1479,15 +1766,14 @@ def test_matches_sin_season_incluye_todas_las_temporadas(client, db):
     no solo la vigente."""
     from datetime import datetime
     from app import models
+
     db.add(models.Season(id=1, name="Apertura 2024", year=2024, tournament_type="Apertura"))
     db.add(models.Season(id=2, name="Apertura 2026", year=2026, tournament_type="Apertura"))
     db.add(models.Team(id=1, name="América"))
     db.add(models.Team(id=2, name="Pachuca"))
     db.flush()
-    db.add(models.Match(season_id=1, home_team_id=1, away_team_id=2, home_score=1,
-                        away_score=0, status="finished", match_date=datetime(2024, 8, 1)))
-    db.add(models.Match(season_id=2, home_team_id=2, away_team_id=1, home_score=2,
-                        away_score=2, status="finished", match_date=datetime(2026, 8, 1)))
+    db.add(models.Match(season_id=1, home_team_id=1, away_team_id=2, home_score=1, away_score=0, status="finished", match_date=datetime(2024, 8, 1)))
+    db.add(models.Match(season_id=2, home_team_id=2, away_team_id=1, home_score=2, away_score=2, status="finished", match_date=datetime(2026, 8, 1)))
     db.commit()
     r = client.get("/matches", params={"status": "finished", "limit": 100}).json()
     assert len(r) == 2  # una de cada temporada
@@ -1498,8 +1784,10 @@ def test_matches_sin_season_incluye_todas_las_temporadas(client, db):
 
 # ---------- Identidad/huella de la BD (diagnostico de entorno) ----------
 
+
 def test_db_fingerprint_estable_y_sin_credenciales():
     from app.db_identity import db_fingerprint, db_target
+
     url = "postgresql://user:secretpass@ep-cool-123.us-east-2.aws.neon.tech/ligamx"
     fp = db_fingerprint(url)
     assert len(fp) == 12
@@ -1517,6 +1805,7 @@ def test_db_fingerprint_estable_y_sin_credenciales():
 
 def test_db_fingerprint_distintas_bases_distinta_huella():
     from app.db_identity import db_fingerprint
+
     a = db_fingerprint("postgresql://u:p@host-a.neon.tech/ligamx")
     b = db_fingerprint("postgresql://u:p@host-b.neon.tech/ligamx")
     c = db_fingerprint("postgresql://u:p@host-a.neon.tech/otra")
@@ -1531,6 +1820,7 @@ def test_sync_status_expone_fingerprint(client):
 
 # ---------- XI probable/esperado (365Scores, solo dato real) ----------
 
+
 def _fake_game_lineups(status_home, status_away):
     """Fabrica un game crudo de 365Scores con lineups en el estado dado."""
     members = [{"id": i, "name": f"Jugador {i}", "jerseyNumber": i} for i in range(1, 24)]
@@ -1538,8 +1828,7 @@ def _fake_game_lineups(status_home, status_away):
     def side(status, first_id):
         mem = [{"id": first_id + i, "status": 1, "position": {"name": "MF"}} for i in range(11)]
         mem += [{"id": first_id + 11 + i, "status": 2} for i in range(3)]  # suplentes
-        return {"name": "Local" if first_id == 1 else "Visita",
-                "lineups": {"status": status, "formation": "4-3-3", "members": mem}}
+        return {"name": "Local" if first_id == 1 else "Visita", "lineups": {"status": status, "formation": "4-3-3", "members": mem}}
 
     return {
         "members": members,
@@ -1550,9 +1839,9 @@ def _fake_game_lineups(status_home, status_away):
 
 def test_365_probable_lineup_disponible(client, monkeypatch):
     from app.scrapers import scores365_scraper
+
     game = _fake_game_lineups("Sin confirmar", "NotConfirmed")  # ambos idiomas
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw",
-                        lambda self, gid: game)
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw", lambda self, gid: game)
     r = client.get("/365scores/matches/123/probable-lineup")
     assert r.status_code == 200
     body = r.json()
@@ -1563,14 +1852,14 @@ def test_365_probable_lineup_disponible(client, monkeypatch):
     assert eq["confirmada"] is False
     assert eq["condicion"] in ("local", "visitante")
     assert eq["formacion"] == "4-3-3"
-    assert len(eq["titulares_probables"]) == 11   # solo titulares, no suplentes
+    assert len(eq["titulares_probables"]) == 11  # solo titulares, no suplentes
 
 
 def test_365_probable_lineup_ya_confirmada(client, monkeypatch):
     from app.scrapers import scores365_scraper
+
     game = _fake_game_lineups("Confirmada", "Confirmed")
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw",
-                        lambda self, gid: game)
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw", lambda self, gid: game)
     body = client.get("/365scores/matches/123/probable-lineup").json()
     assert body["disponible"] is False
     assert body["equipos"] == []
@@ -1579,10 +1868,10 @@ def test_365_probable_lineup_ya_confirmada(client, monkeypatch):
 
 def test_365_probable_lineup_sin_alineacion(client, monkeypatch):
     from app.scrapers import scores365_scraper
+
     # Sin lineups aun (partido lejano): 365Scores no trae el campo
     game = {"members": [], "homeCompetitor": {"name": "Local"}, "awayCompetitor": {"name": "Visita"}}
-    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw",
-                        lambda self, gid: game)
+    monkeypatch.setattr(scores365_scraper.Scores365Scraper, "_game_raw", lambda self, gid: game)
     body = client.get("/365scores/matches/123/probable-lineup").json()
     assert body["disponible"] is False
     assert "no publica" in body["motivo"].lower()
