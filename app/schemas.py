@@ -1,7 +1,17 @@
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field, field_serializer
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import quote_plus
+
+
+def utc_isoformat(value: Optional[datetime]) -> Optional[str]:
+    """Serializa datetimes almacenados como UTC naive con una zona explicita."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
 
 class StadiumBase(BaseModel):
     name: str
@@ -9,6 +19,7 @@ class StadiumBase(BaseModel):
     capacity: Optional[int] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+
 
 class StadiumResponse(StadiumBase):
     id: int
@@ -26,6 +37,7 @@ class StadiumResponse(StadiumBase):
         query = self.name + (f" {self.city}" if self.city else "")
         return "https://www.google.com/maps/search/?api=1&query=" + quote_plus(query)
 
+
 class TeamBase(BaseModel):
     name: str
     short_name: Optional[str] = None
@@ -34,10 +46,12 @@ class TeamBase(BaseModel):
     founded: Optional[int] = None
     logo_url: Optional[str] = None
 
+
 class TeamResponse(TeamBase):
     id: int
     stadium: Optional[StadiumResponse] = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class PlayerBase(BaseModel):
     name: str
@@ -50,10 +64,12 @@ class PlayerBase(BaseModel):
     height: Optional[str] = None
     weight: Optional[str] = None
 
+
 class PlayerResponse(PlayerBase):
     id: int
     team_id: int
     model_config = ConfigDict(from_attributes=True)
+
 
 class MatchBase(BaseModel):
     home_team_id: int
@@ -66,11 +82,18 @@ class MatchBase(BaseModel):
     referee: Optional[str] = None
     sofascore_event_id: Optional[int] = None
 
+
 class MatchResponse(MatchBase):
     id: int
+    espn_event_id: Optional[str] = None
     home_team: Optional[TeamResponse] = None
     away_team: Optional[TeamResponse] = None
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("match_date", when_used="json")
+    def serialize_match_date(self, value: Optional[datetime]) -> Optional[str]:
+        return utc_isoformat(value)
+
 
 class StandingResponse(BaseModel):
     position: int
@@ -85,6 +108,7 @@ class StandingResponse(BaseModel):
     points: int
     model_config = ConfigDict(from_attributes=True)
 
+
 class TopScorerResponse(BaseModel):
     id: int
     player: str
@@ -98,6 +122,7 @@ class TopScorerResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class NewsResponse(BaseModel):
     id: int
     title: str
@@ -108,6 +133,7 @@ class NewsResponse(BaseModel):
     published_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class MatchStatResponse(BaseModel):
     id: int
@@ -132,6 +158,7 @@ class MatchStatResponse(BaseModel):
     crosses: Optional[int] = None
     long_balls: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class PlayerStatResponse(BaseModel):
     id: int
@@ -160,6 +187,7 @@ class MatchEventResponse(BaseModel):
     is_home: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
 
+
 class MatchLineupResponse(BaseModel):
     id: int
     player_name: Optional[str] = None
@@ -170,7 +198,6 @@ class MatchLineupResponse(BaseModel):
     is_substitute: int = 0
     jersey_number: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class PlayerMatchStatResponse(BaseModel):
@@ -200,6 +227,7 @@ class PlayerMatchStatResponse(BaseModel):
 
 class MatchOddsCreate(BaseModel):
     """Snapshot de momios de un partido para archivar (POST /odds)."""
+
     home_team: str
     away_team: str
     season: Optional[str] = None

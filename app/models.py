@@ -2,21 +2,23 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, JSO
 from sqlalchemy.orm import relationship
 from app.database import Base
 
+
 class Stadium(Base):
     __tablename__ = "stadiums"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     city = Column(String)
     capacity = Column(Integer, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    
+
     teams = relationship("Team", back_populates="stadium")
+
 
 class Team(Base):
     __tablename__ = "teams"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     short_name = Column(String)
@@ -25,26 +27,28 @@ class Team(Base):
     colors = Column(String, nullable=True)
     logo_url = Column(String, nullable=True)
     stadium_id = Column(Integer, ForeignKey("stadiums.id"), nullable=True)
-    
+
     stadium = relationship("Stadium", back_populates="teams")
     players = relationship("Player", back_populates="team")
     home_matches = relationship("Match", foreign_keys="Match.home_team_id", back_populates="home_team")
     away_matches = relationship("Match", foreign_keys="Match.away_team_id", back_populates="away_team")
 
+
 class Season(Base):
     __tablename__ = "seasons"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     year = Column(Integer)
     tournament_type = Column(String)
-    
+
     matches = relationship("Match", back_populates="season")
     standings = relationship("Standing", back_populates="season")
 
+
 class Match(Base):
     __tablename__ = "matches"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     season_id = Column(Integer, ForeignKey("seasons.id"))
     week_number = Column(Integer, nullable=True)
@@ -56,11 +60,14 @@ class Match(Base):
     away_score = Column(Integer, nullable=True)
     status = Column(String, default="scheduled")
     sofascore_event_id = Column(Integer, nullable=True, index=True)
-    external_event_id = Column(String, nullable=True, index=True)  # id del partido en la fuente (ESPN/365)
+    # Identificador legado de la fuente primaria. Se conserva por compatibilidad,
+    # pero el contrato estable y el upsert usan exclusivamente espn_event_id.
+    external_event_id = Column(String, nullable=True, index=True)
+    espn_event_id = Column(String, nullable=True, unique=True, index=True)
     referee = Column(String, nullable=True)  # arbitro principal (via 365Scores; ESPN no lo expone)
     stage_name = Column(String, nullable=True)  # fase: regular o nombre de la fase final (Liguilla)
     round_name = Column(String, nullable=True)  # ronda: "Fecha N", "Cuartos de Final", "Semifinal", "Final"...
-    
+
     season = relationship("Season", back_populates="matches")
     stadium = relationship("Stadium")
     home_team = relationship("Team", foreign_keys=[home_team_id], back_populates="home_matches")
@@ -68,9 +75,10 @@ class Match(Base):
     match_events = relationship("MatchEvent", back_populates="match", cascade="all, delete-orphan")
     match_lineups = relationship("MatchLineup", back_populates="match", cascade="all, delete-orphan")
 
+
 class Player(Base):
     __tablename__ = "players"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     team_id = Column(Integer, ForeignKey("teams.id"))
     name = Column(String, index=True)
@@ -79,18 +87,19 @@ class Player(Base):
     nationality = Column(String, nullable=True)
     birth_date = Column(String, nullable=True)
     photo_url = Column(String, nullable=True)
-    flag_url = Column(String, nullable=True)   # bandera del pais (citizenship) via ESPN
-    height = Column(String, nullable=True)      # ej "1.85 m"
-    weight = Column(String, nullable=True)      # ej "78 kg"
+    flag_url = Column(String, nullable=True)  # bandera del pais (citizenship) via ESPN
+    height = Column(String, nullable=True)  # ej "1.85 m"
+    weight = Column(String, nullable=True)  # ej "78 kg"
     # id del jugador en 365Scores (fuente de player_match_stats). Permite cruzar
     # stats por id EXACTO en vez de por nombre. Se rellena en el sync (best-effort).
     external_365_id = Column(Integer, nullable=True, index=True)
-    
+
     team = relationship("Team", back_populates="players")
+
 
 class Standing(Base):
     __tablename__ = "standings"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     season_id = Column(Integer, ForeignKey("seasons.id"))
     team_id = Column(Integer, ForeignKey("teams.id"))
@@ -103,7 +112,7 @@ class Standing(Base):
     goals_against = Column(Integer, default=0)
     goal_difference = Column(Integer, default=0)
     points = Column(Integer, default=0)
-    
+
     season = relationship("Season", back_populates="standings")
     team = relationship("Team")
 
@@ -120,6 +129,7 @@ class TopScorer(Base):
     season = Column(String, nullable=True)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
+
 class News(Base):
     __tablename__ = "news"
     id = Column(Integer, primary_key=True, index=True)
@@ -131,11 +141,12 @@ class News(Base):
     published_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
+
 class SyncLog(Base):
     __tablename__ = "sync_logs"
     id = Column(Integer, primary_key=True, index=True)
     source = Column(String, nullable=True)
-    status = Column(String, index=True)          # "success" | "error"
+    status = Column(String, index=True)  # "success" | "error"
     detail = Column(String, nullable=True)
     season = Column(String, nullable=True)
     teams = Column(Integer, nullable=True)
@@ -144,6 +155,7 @@ class SyncLog(Base):
     duration_seconds = Column(Float, nullable=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, default=func.now(), index=True)
+
 
 class MatchStat(Base):
     __tablename__ = "match_stats"
@@ -170,6 +182,7 @@ class MatchStat(Base):
     long_balls = Column(Integer, nullable=True)
     team = relationship("Team")
 
+
 class PlayerStat(Base):
     __tablename__ = "player_stats"
     id = Column(Integer, primary_key=True, index=True)
@@ -195,6 +208,7 @@ class PlayerMatchStat(Base):
     por SQL. Los campos numericos clave estan promovidos a columnas (para ordenar
     y sumar) y el resto de metricas se guardan completas en `stats` (JSON).
     """
+
     __tablename__ = "player_match_stats"
     id = Column(Integer, primary_key=True, index=True)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=True, index=True)
@@ -224,7 +238,7 @@ class PlayerMatchStat(Base):
 
 class MatchEvent(Base):
     __tablename__ = "match_events"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=True)
     sofascore_event_id = Column(Integer, nullable=True)
@@ -236,12 +250,13 @@ class MatchEvent(Base):
     team_name = Column(String, nullable=True)
     description = Column(String, nullable=True)
     is_home = Column(Integer, nullable=True)
-    
+
     match = relationship("Match", back_populates="match_events")
+
 
 class MatchLineup(Base):
     __tablename__ = "match_lineups"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=True)
     sofascore_event_id = Column(Integer, nullable=True)
@@ -252,7 +267,7 @@ class MatchLineup(Base):
     position = Column(String, nullable=True)
     is_substitute = Column(Integer, default=0)
     jersey_number = Column(Integer, nullable=True)
-    
+
     match = relationship("Match", back_populates="match_lineups")
 
 
@@ -265,6 +280,7 @@ class MatchOdds(Base):
     con su `captured_at`: es una SERIE TEMPORAL (los momios se mueven), pensada
     para poder backtestear luego la mezcla modelo+mercado con datos reales.
     """
+
     __tablename__ = "match_odds"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -272,7 +288,7 @@ class MatchOdds(Base):
     home_team = Column(String, index=True)
     away_team = Column(String, index=True)
     match_date = Column(DateTime, nullable=True)
-    source = Column(String, nullable=True)          # p. ej. "odds-api.io", casa
+    source = Column(String, nullable=True)  # p. ej. "odds-api.io", casa
     # 1X2 (cuota decimal)
     odds_local = Column(Float, nullable=True)
     odds_empate = Column(Float, nullable=True)
@@ -281,5 +297,5 @@ class MatchOdds(Base):
     ou_linea = Column(Float, nullable=True)
     odds_over = Column(Float, nullable=True)
     odds_under = Column(Float, nullable=True)
-    extra = Column(JSON, nullable=True)             # payload completo (por si acaso)
+    extra = Column(JSON, nullable=True)  # payload completo (por si acaso)
     captured_at = Column(DateTime, default=func.now(), index=True)
