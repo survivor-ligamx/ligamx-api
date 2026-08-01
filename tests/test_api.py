@@ -962,10 +962,57 @@ def test_compare_teams(client, seeded, db):
 def test_predict_match(client, seeded):
     r = client.get("/predict", params={"home": 1, "away": 2}).json()
     p = r["probabilities"]
-    assert abs(p["home_win"] + p["draw"] + p["away_win"] - 1.0) < 0.05
-    assert "expected_goals" in r and "most_likely_score" in r
+    assert abs(p["home_win"] + p["draw"] + p["away_win"] - 1.0) < 0.01
+    assert "expected_goals" in r and "most_likely_score" in r and "top_scorelines" in r
+    assert "probabilities_raw" in r and "probabilities_regularized" in r
+    assert "sample_size" in r and "prior_strength" in r and "uncertainty" in r and "confidence" in r
+    assert abs(r["draw_probability"] - p["draw"]) <= 0.001
     # equipo 1 (mejor ataque/defensa) y de local debe ser favorito
     assert p["home_win"] > p["away_win"]
+    # con muestra corta, la version regularizada debe ser menos extrema que la cruda
+    raw = r["probabilities_raw"]
+    assert abs(raw["home_win"] - 0.5) >= abs(p["home_win"] - 0.5)
+    assert len(r["top_scorelines"]) >= 3
+
+
+def test_predict_muestra_amplia_sube_confianza(client, seeded, db):
+    from app import models
+
+    for i in range(2, 10):
+        db.add(
+            models.Match(
+                id=100 + i,
+                season_id=1,
+                home_team_id=1,
+                away_team_id=2,
+                home_score=2 if i % 2 else 1,
+                away_score=1 if i % 2 else 0,
+                status="finished",
+            )
+        )
+    db.commit()
+
+    r = client.get("/predict", params={"home": 1, "away": 2, "prior_strength": 5}).json()
+    assert r["confidence"] > 0.6
+    assert r["uncertainty"] < 0.4
+    assert r["sample_size"]["home_team"]["context"] in ("home", "overall")
+    assert r["sample_size"]["away_team"]["context"] in ("away", "overall")
+
+
+def test_predict_equipos_nuevos_sin_historial(client, seeded, db):
+    from app import models
+
+    db.add(models.Team(id=3, name="Equipo Nuevo A"))
+    db.add(models.Team(id=4, name="Equipo Nuevo B"))
+    db.commit()
+
+    r = client.get("/predict", params={"home": 3, "away": 4}).json()
+    assert r["sample_size"]["home_team"]["used"] == 0
+    assert r["sample_size"]["away_team"]["used"] == 0
+    p = r["probabilities"]
+    assert abs(p["home_win"] + p["draw"] + p["away_win"] - 1.0) < 0.01
+    assert r["expected_goals"]["home"] > 0
+    assert r["expected_goals"]["away"] > 0
 
 
 def test_predict_sin_datos(client, db):
@@ -975,8 +1022,38 @@ def test_predict_sin_datos(client, db):
     db.add(models.Team(id=1, name="A"))
     db.add(models.Team(id=2, name="B"))
     db.commit()
-    # sin standings con partidos jugados -> 400
-    assert client.get("/predict", params={"home": 1, "away": 2}).status_code == 400
+    # sin historico ni tabla -> fallback neutral seguro (sin 500/400)
+    r = client.get("/predict", params={"home": 1, "away": 2})
+    assert r.status_code == 200
+    body = r.json()
+    p = body["probabilities"]
+    assert abs(p["home_win"] + p["draw"] + p["away_win"] - 1.0) < 0.01
+    assert body["sample_size"]["league_matches"] == 0
+
+
+def test_predict_cero_goles_y_marcadores_bajos(client, seeded, db):
+    from app import models
+
+    # Convertimos el partido sembrado a 0-0 para validar estabilidad con pocos goles.
+    m = db.get(models.Match, 1)
+    m.home_score = 0
+    m.away_score = 0
+    db.commit()
+
+    r = client.get("/predict", params={"home": 1, "away": 2}).json()
+    p = r["probabilities"]
+    assert abs(p["home_win"] + p["draw"] + p["away_win"] - 1.0) < 0.01
+    assert r["draw_probability"] >= 0.2
+    lows = {(s["home"], s["away"]) for s in r["top_scorelines"]}
+    assert any(score in lows for score in {(0, 0), (1, 0), (0, 1), (1, 1)})
+
+
+def test_predict_normaliza_probabilidades(client, seeded):
+    r = client.get("/predict", params={"home": 1, "away": 2, "prior_strength": 6}).json()
+    reg = r["probabilities_regularized"]
+    raw = r["probabilities_raw"]
+    assert abs(sum(reg.values()) - 1.0) < 0.01
+    assert abs(sum(raw.values()) - 1.0) < 0.01
 
 
 # ---------- Dashboard y readiness ----------
