@@ -4,6 +4,7 @@ El predictor usa un modelo de Poisson clasico a partir de la tabla de posiciones
 (fuerzas de ataque/defensa relativas a la media de la liga + ventaja de local),
 sin dependencias externas ni ML.
 """
+
 import math
 import unicodedata
 from fastapi import APIRouter, Depends, Query
@@ -15,9 +16,9 @@ from app import models
 
 router = APIRouter()
 
-HOME_ADVANTAGE = 1.20   # los locales anotan ~20% mas
-AWAY_FACTOR = 0.85      # los visitantes anotan ~15% menos
-MAX_GOALS = 8           # rejilla de Poisson
+HOME_ADVANTAGE = 1.20  # los locales anotan ~20% mas
+AWAY_FACTOR = 0.85  # los visitantes anotan ~15% menos
+MAX_GOALS = 8  # rejilla de Poisson
 DEFAULT_PRIOR_STRENGTH = 5.0
 MIN_SPLIT_SAMPLE = 3
 DEFAULT_DC_RHO = -0.08
@@ -43,10 +44,16 @@ def _player_season_agg(db: Session, player, label: str) -> dict:
         return sum(getattr(r, attr) or 0 for r in rows)
 
     return {
-        "player_id": player.id, "name": player.name, "team_id": player.team_id,
-        "appearances": len(rows), "minutes": s("minutes"), "goals": s("goals"),
-        "assists": s("assists"), "shots": s("shots"),
-        "xg": round(s("xg"), 2), "xa": round(s("xa"), 2),
+        "player_id": player.id,
+        "name": player.name,
+        "team_id": player.team_id,
+        "appearances": len(rows),
+        "minutes": s("minutes"),
+        "goals": s("goals"),
+        "assists": s("assists"),
+        "shots": s("shots"),
+        "xg": round(s("xg"), 2),
+        "xa": round(s("xa"), 2),
         "avg_rating": round(sum(ratings) / len(ratings), 2) if ratings else None,
     }
 
@@ -64,22 +71,30 @@ def compare_players(a: int = Query(...), b: int = Query(...), season: str = Quer
 def _team_card(db: Session, team, season_id, label: str) -> dict:
     st = None
     if season_id is not None:
-        st = db.query(models.Standing).filter(models.Standing.season_id == season_id,
-                                               models.Standing.team_id == team.id).first()
+        st = db.query(models.Standing).filter(models.Standing.season_id == season_id, models.Standing.team_id == team.id).first()
     M = models.PlayerMatchStat
     xg = db.query(func.sum(M.xg)).filter(M.team_id == team.id, M.season == label).scalar()
     goals = db.query(func.sum(M.goals)).filter(M.team_id == team.id, M.season == label).scalar()
     standing = None
     if st:
         standing = {
-            "position": st.position, "points": st.points, "played": st.played,
-            "won": st.won, "drawn": st.drawn, "lost": st.lost,
-            "goals_for": st.goals_for, "goals_against": st.goals_against,
+            "position": st.position,
+            "points": st.points,
+            "played": st.played,
+            "won": st.won,
+            "drawn": st.drawn,
+            "lost": st.lost,
+            "goals_for": st.goals_for,
+            "goals_against": st.goals_against,
             "goal_difference": st.goal_difference,
         }
     return {
-        "team_id": team.id, "name": team.name, "logo_url": team.logo_url,
-        "standing": standing, "xg": round(float(xg or 0), 2), "goals": int(goals or 0),
+        "team_id": team.id,
+        "name": team.name,
+        "logo_url": team.logo_url,
+        "standing": standing,
+        "xg": round(float(xg or 0), 2),
+        "goals": int(goals or 0),
     }
 
 
@@ -95,7 +110,7 @@ def compare_teams(a: int = Query(...), b: int = Query(...), season: str = Query(
 
 # ---------- Predictor de partidos (Poisson) ----------
 def _poisson(k: int, lam: float) -> float:
-    return math.exp(-lam) * (lam ** k) / math.factorial(k)
+    return math.exp(-lam) * (lam**k) / math.factorial(k)
 
 
 def _safe_div(num: float, den: float) -> float:
@@ -143,19 +158,15 @@ def _match_sample_stats(db: Session, season_id: int | None):
     # únicamente los partidos ya terminados del torneo solicitado.
     if season_id is not None:
         query = query.filter(models.Match.season_id == season_id)
-    rows = (
-        query
-        .filter(
-            and_(
-                models.Match.status == 'finished',
-                models.Match.home_score.isnot(None),
-                models.Match.away_score.isnot(None),
-                models.Match.home_team_id.isnot(None),
-                models.Match.away_team_id.isnot(None),
-            )
+    rows = query.filter(
+        and_(
+            models.Match.status == "finished",
+            models.Match.home_score.isnot(None),
+            models.Match.away_score.isnot(None),
+            models.Match.home_team_id.isnot(None),
+            models.Match.away_team_id.isnot(None),
         )
-        .all()
-    )
+    ).all()
     team_stats = {}
     home_goals_total = 0.0
     away_goals_total = 0.0
@@ -164,9 +175,9 @@ def _match_sample_stats(db: Session, season_id: int | None):
     def acc(team_id: int):
         if team_id not in team_stats:
             team_stats[team_id] = {
-                'overall': {'matches': 0, 'gf': 0.0, 'ga': 0.0},
-                'home': {'matches': 0, 'gf': 0.0, 'ga': 0.0},
-                'away': {'matches': 0, 'gf': 0.0, 'ga': 0.0},
+                "overall": {"matches": 0, "gf": 0.0, "ga": 0.0},
+                "home": {"matches": 0, "gf": 0.0, "ga": 0.0},
+                "away": {"matches": 0, "gf": 0.0, "ga": 0.0},
             }
         return team_stats[team_id]
 
@@ -182,25 +193,25 @@ def _match_sample_stats(db: Session, season_id: int | None):
         h = acc(int(m.home_team_id))
         a = acc(int(m.away_team_id))
 
-        h['overall']['matches'] += 1
-        h['overall']['gf'] += hg
-        h['overall']['ga'] += ag
-        h['home']['matches'] += 1
-        h['home']['gf'] += hg
-        h['home']['ga'] += ag
+        h["overall"]["matches"] += 1
+        h["overall"]["gf"] += hg
+        h["overall"]["ga"] += ag
+        h["home"]["matches"] += 1
+        h["home"]["gf"] += hg
+        h["home"]["ga"] += ag
 
-        a['overall']['matches'] += 1
-        a['overall']['gf'] += ag
-        a['overall']['ga'] += hg
-        a['away']['matches'] += 1
-        a['away']['gf'] += ag
-        a['away']['ga'] += hg
+        a["overall"]["matches"] += 1
+        a["overall"]["gf"] += ag
+        a["overall"]["ga"] += hg
+        a["away"]["matches"] += 1
+        a["away"]["gf"] += ag
+        a["away"]["ga"] += hg
 
     if matches_total <= 0:
-        return team_stats, {'home_avg': 0.0, 'away_avg': 0.0, 'overall_avg': 0.0, 'matches': 0}
+        return team_stats, {"home_avg": 0.0, "away_avg": 0.0, "overall_avg": 0.0, "matches": 0}
     home_avg = _safe_div(home_goals_total, matches_total)
     away_avg = _safe_div(away_goals_total, matches_total)
-    return team_stats, {'home_avg': home_avg, 'away_avg': away_avg, 'overall_avg': (home_avg + away_avg) / 2.0, 'matches': matches_total}
+    return team_stats, {"home_avg": home_avg, "away_avg": away_avg, "overall_avg": (home_avg + away_avg) / 2.0, "matches": matches_total}
 
 
 def _standing_fallback_stats(standings):
@@ -216,49 +227,52 @@ def _standing_fallback_stats(standings):
         league_gf += gf
         league_played += played
         by_team[s.team_id] = {
-            'overall': {'matches': played, 'gf': gf, 'ga': ga},
-            'home': {'matches': 0, 'gf': 0.0, 'ga': 0.0},
-            'away': {'matches': 0, 'gf': 0.0, 'ga': 0.0},
+            "overall": {"matches": played, "gf": gf, "ga": ga},
+            "home": {"matches": 0, "gf": 0.0, "ga": 0.0},
+            "away": {"matches": 0, "gf": 0.0, "ga": 0.0},
         }
     avg = _safe_div(league_gf, league_played)
-    return by_team, {'home_avg': avg * HOME_ADVANTAGE, 'away_avg': avg * AWAY_FACTOR, 'overall_avg': avg, 'matches': league_played}
+    return by_team, {"home_avg": avg * HOME_ADVANTAGE, "away_avg": avg * AWAY_FACTOR, "overall_avg": avg, "matches": league_played}
 
 
 def _select_context(team_bundle, is_home: bool):
-    side_key = 'home' if is_home else 'away'
+    side_key = "home" if is_home else "away"
     side = team_bundle.get(side_key, {})
-    side_matches = int(side.get('matches') or 0)
+    side_matches = int(side.get("matches") or 0)
     if side_matches >= MIN_SPLIT_SAMPLE:
         return side, side_matches, side_key
-    overall = team_bundle.get('overall', {})
-    return overall, int(overall.get('matches') or 0), 'overall'
+    overall = team_bundle.get("overall", {})
+    return overall, int(overall.get("matches") or 0), "overall"
 
 
 def _rates(team_bundle, league, is_home: bool, prior_strength: float):
     context, sample, context_name = _select_context(team_bundle, is_home=is_home)
-    gf_rate = _safe_div(context.get('gf', 0.0), sample)
-    ga_rate = _safe_div(context.get('ga', 0.0), sample)
-    side_mean = league['home_avg'] if is_home else league['away_avg']
+    gf_rate = _safe_div(context.get("gf", 0.0), sample)
+    ga_rate = _safe_div(context.get("ga", 0.0), sample)
+    side_mean = league["home_avg"] if is_home else league["away_avg"]
     # Aun con contexto overall, el prior conserva la sede; de otro modo la
     # ventaja local desaparecía precisamente cuando la muestra era pequeña.
     prior_mean = side_mean
     reg_gf = _regularize_rate(gf_rate, sample, prior_mean, prior_strength)
     reg_ga = _regularize_rate(ga_rate, sample, prior_mean, prior_strength)
     return {
-        'sample': sample,
-        'context': context_name,
-        'raw_gf_rate': gf_rate if sample else prior_mean,
-        'raw_ga_rate': ga_rate if sample else prior_mean,
-        'reg_gf_rate': reg_gf,
-        'reg_ga_rate': reg_ga,
+        "sample": sample,
+        "context": context_name,
+        "raw_gf_rate": gf_rate if sample else prior_mean,
+        "raw_ga_rate": ga_rate if sample else prior_mean,
+        "reg_gf_rate": reg_gf,
+        "reg_ga_rate": reg_ga,
     }
 
 
 @router.get("/predict")
-def predict_match(home: int = Query(..., description="team_id local"),
-                  away: int = Query(..., description="team_id visitante"),
-                  prior_strength: float = Query(DEFAULT_PRIOR_STRENGTH, ge=1.0, le=20.0, description='Fuerza del prior en partidos efectivos'),
-                  season: str = Query(None), db: Session = Depends(get_db)):
+def predict_match(
+    home: int = Query(..., description="team_id local"),
+    away: int = Query(..., description="team_id visitante"),
+    prior_strength: float = Query(DEFAULT_PRIOR_STRENGTH, ge=1.0, le=20.0, description="Fuerza del prior en partidos efectivos"),
+    season: str = Query(None),
+    db: Session = Depends(get_db),
+):
     """Predice un partido entre dos equipos con un modelo de Poisson a partir de
     la tabla: fuerza de ataque/defensa relativa a la media de la liga + ventaja de
     local. Devuelve goles esperados, probabilidades (1/X/2) y marcador mas probable."""
@@ -267,28 +281,28 @@ def predict_match(home: int = Query(..., description="team_id local"),
     season_id = resolve_season_id(db, season)
     standings = db.query(models.Standing).filter(models.Standing.season_id == season_id).all() if season_id is not None else []
     team_stats, league = _match_sample_stats(db, season_id)
-    if league['matches'] <= 0:
+    if league["matches"] <= 0:
         team_stats, league = _standing_fallback_stats([s for s in standings if (s.played or 0) > 0])
 
-    if league['overall_avg'] <= 0:
-        league = {'home_avg': 1.35, 'away_avg': 1.05, 'overall_avg': 1.20, 'matches': 0}
+    if league["overall_avg"] <= 0:
+        league = {"home_avg": 1.35, "away_avg": 1.05, "overall_avg": 1.20, "matches": 0}
 
-    neutral = {'overall': {'matches': 0, 'gf': 0.0, 'ga': 0.0}, 'home': {'matches': 0, 'gf': 0.0, 'ga': 0.0}, 'away': {'matches': 0, 'gf': 0.0, 'ga': 0.0}}
+    neutral = {"overall": {"matches": 0, "gf": 0.0, "ga": 0.0}, "home": {"matches": 0, "gf": 0.0, "ga": 0.0}, "away": {"matches": 0, "gf": 0.0, "ga": 0.0}}
     home_bundle = team_stats.get(home, neutral)
     away_bundle = team_stats.get(away, neutral)
 
     home_rates = _rates(home_bundle, league, is_home=True, prior_strength=prior_strength)
     away_rates = _rates(away_bundle, league, is_home=False, prior_strength=prior_strength)
 
-    base_avg = max(league['overall_avg'], 0.05)
+    base_avg = max(league["overall_avg"], 0.05)
 
-    raw_h = max(0.05, home_rates['raw_gf_rate'] * (away_rates['raw_ga_rate'] / base_avg))
-    raw_a = max(0.05, away_rates['raw_gf_rate'] * (home_rates['raw_ga_rate'] / base_avg))
+    raw_h = max(0.05, home_rates["raw_gf_rate"] * (away_rates["raw_ga_rate"] / base_avg))
+    raw_a = max(0.05, away_rates["raw_gf_rate"] * (home_rates["raw_ga_rate"] / base_avg))
 
-    exp_h = max(0.05, home_rates['reg_gf_rate'] * (away_rates['reg_ga_rate'] / base_avg))
-    exp_a = max(0.05, away_rates['reg_gf_rate'] * (home_rates['reg_ga_rate'] / base_avg))
+    exp_h = max(0.05, home_rates["reg_gf_rate"] * (away_rates["reg_ga_rate"] / base_avg))
+    exp_a = max(0.05, away_rates["reg_gf_rate"] * (home_rates["reg_ga_rate"] / base_avg))
 
-    confidence = min(1.0, ((home_rates['sample'] + away_rates['sample']) / 2.0) / (((home_rates['sample'] + away_rates['sample']) / 2.0) + prior_strength))
+    confidence = min(1.0, ((home_rates["sample"] + away_rates["sample"]) / 2.0) / (((home_rates["sample"] + away_rates["sample"]) / 2.0) + prior_strength))
     max_lam = 3.1 + confidence * 0.9
     exp_h = min(max_lam, exp_h)
     exp_a = min(max_lam, exp_a)
@@ -326,9 +340,9 @@ def predict_match(home: int = Query(..., description="team_id local"),
                 away_win += p
             scored.append((i, j, p))
 
-    tempered = _temper_outcome_extremes({'home_win': home_win, 'draw': draw, 'away_win': away_win}, confidence)
+    tempered = _temper_outcome_extremes({"home_win": home_win, "draw": draw, "away_win": away_win}, confidence)
     raw_total = home_raw + draw_raw + away_raw or 1.0
-    raw_probs = {'home_win': home_raw / raw_total, 'draw': draw_raw / raw_total, 'away_win': away_raw / raw_total}
+    raw_probs = {"home_win": home_raw / raw_total, "draw": draw_raw / raw_total, "away_win": away_raw / raw_total}
     top_scorelines = sorted(scored, key=lambda x: x[2], reverse=True)[:3]
     best_score = top_scorelines[0]
     return {
@@ -355,8 +369,20 @@ def predict_match(home: int = Query(..., description="team_id local"),
         "most_likely_score": {"home": best_score[0], "away": best_score[1], "probability": round(best_score[2], 3)},
         "top_scorelines": [{"home": i, "away": j, "probability": round(p, 3)} for i, j, p in top_scorelines],
         "sample_size": {
-            "home_team": {"overall": home_bundle["overall"]["matches"], "home": home_bundle["home"]["matches"], "away": home_bundle["away"]["matches"], "used": home_rates["sample"], "context": home_rates["context"]},
-            "away_team": {"overall": away_bundle["overall"]["matches"], "home": away_bundle["home"]["matches"], "away": away_bundle["away"]["matches"], "used": away_rates["sample"], "context": away_rates["context"]},
+            "home_team": {
+                "overall": home_bundle["overall"]["matches"],
+                "home": home_bundle["home"]["matches"],
+                "away": home_bundle["away"]["matches"],
+                "used": home_rates["sample"],
+                "context": home_rates["context"],
+            },
+            "away_team": {
+                "overall": away_bundle["overall"]["matches"],
+                "home": away_bundle["home"]["matches"],
+                "away": away_bundle["away"]["matches"],
+                "used": away_rates["sample"],
+                "context": away_rates["context"],
+            },
             "league_matches": league["matches"],
         },
         "prior_strength": round(prior_strength, 2),
@@ -374,7 +400,6 @@ def predict_match(home: int = Query(..., description="team_id local"),
     }
 
 
-
 # ---------- Power ranking ----------
 @router.get("/power-ranking")
 def power_ranking(season: str = Query(None), db: Session = Depends(get_db)):
@@ -385,12 +410,10 @@ def power_ranking(season: str = Query(None), db: Session = Depends(get_db)):
     label = resolve_season_label(db, season)
     standings = []
     if season_id is not None:
-        standings = (db.query(models.Standing).options(joinedload(models.Standing.team))
-                     .filter(models.Standing.season_id == season_id).all())
+        standings = db.query(models.Standing).options(joinedload(models.Standing.team)).filter(models.Standing.season_id == season_id).all()
 
     M = models.PlayerMatchStat
-    xg_rows = (db.query(M.team_id, func.sum(M.xg)).filter(M.season == label)
-               .group_by(M.team_id).all())
+    xg_rows = db.query(M.team_id, func.sum(M.xg)).filter(M.season == label).group_by(M.team_id).all()
     xg_by_team = {tid: float(x or 0) for tid, x in xg_rows}
 
     out = []
@@ -399,16 +422,17 @@ def power_ranking(season: str = Query(None), db: Session = Depends(get_db)):
         ppg = s.points / played if played else 0.0
         gdpg = s.goal_difference / played if played else 0.0
         rating = round(min(100, max(0, (ppg / 3) * 70 + ((gdpg + 3) / 6) * 30)), 1)  # type: ignore[type-var]
-        out.append({
-            "team": {"id": s.team_id, "name": s.team.name if s.team else None,
-                     "logo_url": s.team.logo_url if s.team else None},
-            "rating": rating,
-            "played": played,
-            "ppg": round(ppg, 2),
-            "gd_per_game": round(gdpg, 2),
-            "xg": round(xg_by_team.get(s.team_id, 0.0), 2),
-            "table_position": s.position,
-        })
+        out.append(
+            {
+                "team": {"id": s.team_id, "name": s.team.name if s.team else None, "logo_url": s.team.logo_url if s.team else None},
+                "rating": rating,
+                "played": played,
+                "ppg": round(ppg, 2),
+                "gd_per_game": round(gdpg, 2),
+                "xg": round(xg_by_team.get(s.team_id, 0.0), 2),
+                "table_position": s.position,
+            }
+        )
     out.sort(key=lambda r: r["rating"], reverse=True)  # type: ignore[arg-type, return-value]
     for i, r in enumerate(out):
         r["rank"] = i + 1
@@ -419,15 +443,13 @@ def power_ranking(season: str = Query(None), db: Session = Depends(get_db)):
     }
 
 
-
 # ---------- Jugadores a seguir en un partido ----------
 def _team_standouts(db: Session, team_id: int, label: str, limit: int):
     """Jugadores destacados de un equipo en la temporada, con un 'watch score'
     y un motivo explicable. Sale de player_match_stats."""
     M = models.PlayerMatchStat
     rows = (
-        db.query(M.player_name, func.count(M.id), func.sum(M.goals), func.sum(M.assists),
-                 func.sum(M.xg), func.sum(M.xa), func.avg(M.rating))
+        db.query(M.player_name, func.count(M.id), func.sum(M.goals), func.sum(M.assists), func.sum(M.xg), func.sum(M.xa), func.avg(M.rating))
         .filter(M.team_id == team_id, M.season == label)
         .group_by(M.player_name)
         .all()
@@ -454,19 +476,25 @@ def _team_standouts(db: Session, team_id: int, label: str, limit: int):
         else:
             reason = "jugador habitual del equipo"
 
-        players.append({
-            "player": name, "watch_score": round(score, 1), "reason": reason,
-            "appearances": apps, "goals": g, "assists": a,
-            "xg": round(xg, 2), "xa": round(xa, 2),
-            "avg_rating": round(r, 2) if r else None,
-        })
+        players.append(
+            {
+                "player": name,
+                "watch_score": round(score, 1),
+                "reason": reason,
+                "appearances": apps,
+                "goals": g,
+                "assists": a,
+                "xg": round(xg, 2),
+                "xa": round(xa, 2),
+                "avg_rating": round(r, 2) if r else None,
+            }
+        )
     players.sort(key=lambda p: p["watch_score"], reverse=True)
     return players[:limit]
 
 
 @router.get("/matches/{match_id}/players-to-watch")
-def players_to_watch(match_id: int, limit: int = Query(3, ge=1, le=6),
-                     season: str = Query(None), db: Session = Depends(get_db)):
+def players_to_watch(match_id: int, limit: int = Query(3, ge=1, le=6), season: str = Query(None), db: Session = Depends(get_db)):
     """Jugadores a seguir en un partido: los más destacados de cada equipo según
     su forma de la temporada (goles, asistencias, xG, xA y rating)."""
     match = get_or_404(db, models.Match, match_id)

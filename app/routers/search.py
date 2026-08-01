@@ -1,5 +1,6 @@
 """Busqueda global: un solo endpoint para encontrar equipos, jugadores y
 estadios por nombre, ignorando acentos y mayusculas."""
+
 import unicodedata
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
@@ -30,13 +31,15 @@ def search(
     nq = _norm(q)
 
     teams = [
-        t for t in db.query(models.Team).all()
+        t
+        for t in db.query(models.Team).all()
         if nq in _norm(t.name) or nq in _norm(t.short_name or "")  # type: ignore[arg-type]
     ]
     teams.sort(key=lambda t: (_rank(t.name, nq), _norm(t.name)))  # type: ignore[arg-type]
 
     players = [
-        p for p in db.query(models.Player).options(joinedload(models.Player.team)).all()
+        p
+        for p in db.query(models.Player).options(joinedload(models.Player.team)).all()
         if nq in _norm(p.name)  # type: ignore[arg-type]
     ]
     players.sort(key=lambda p: (_rank(p.name, nq), _norm(p.name)))  # type: ignore[arg-type]
@@ -44,16 +47,29 @@ def search(
     stadiums = [s for s in db.query(models.Stadium).all() if nq in _norm(s.name)]  # type: ignore[arg-type]
     stadiums.sort(key=lambda s: (_rank(s.name, nq), _norm(s.name)))  # type: ignore[arg-type]
 
-    team_out = [{
-        "id": t.id, "name": t.name, "short_name": t.short_name,
-        "city": t.city, "logo_url": t.logo_url,
-    } for t in teams[:limit]]
+    team_out = [
+        {
+            "id": t.id,
+            "name": t.name,
+            "short_name": t.short_name,
+            "city": t.city,
+            "logo_url": t.logo_url,
+        }
+        for t in teams[:limit]
+    ]
 
-    player_out = [{
-        "id": p.id, "name": p.name, "team_id": p.team_id,
-        "team_name": p.team.name if p.team else None,
-        "position": p.position, "number": p.number, "photo_url": p.photo_url,
-    } for p in players[:limit]]
+    player_out = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "team_id": p.team_id,
+            "team_name": p.team.name if p.team else None,
+            "position": p.position,
+            "number": p.number,
+            "photo_url": p.photo_url,
+        }
+        for p in players[:limit]
+    ]
 
     stadium_out = [{"id": s.id, "name": s.name, "city": s.city} for s in stadiums[:limit]]
 

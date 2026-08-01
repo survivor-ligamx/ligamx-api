@@ -6,6 +6,7 @@ endpoints que golpean fuentes externas. Configurable por entorno:
   - RATE_LIMIT_DEFAULT: limite global por IP (por defecto "200/minute").
   - RATE_LIMIT_SYNC: limite para los POST /sync* (por defecto "10/minute").
 """
+
 import os
 from slowapi import Limiter
 from slowapi.util import get_remote_address

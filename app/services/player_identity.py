@@ -10,6 +10,7 @@ id de 365Scores correspondiente. La clave para que sea robusto: emparejamos SOLO
 DENTRO DEL MISMO EQUIPO (player_match_stats.team_id ya es el id de equipo de
 nuestra BD), donde los apellidos son practicamente unicos.
 """
+
 import logging
 import unicodedata
 
@@ -26,10 +27,7 @@ _AMBIGUITY_MARGIN = 0.15
 
 def _norm(s: str) -> str:
     """Minusculas sin acentos."""
-    return "".join(
-        c for c in unicodedata.normalize("NFD", s or "")
-        if unicodedata.category(c) != "Mn"
-    ).lower().strip()
+    return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").lower().strip()
 
 
 def _tokens(name: str) -> list[str]:
@@ -124,8 +122,8 @@ def build_player_identity_map(db, season: Optional[str] = None, force: bool = Fa
     # Enlaces ya existentes: se preservan (a menos que force). Sus jugadores e ids
     # de 365 quedan "reservados" para no pisarlos.
     preserved = 0
-    taken: dict[int, set] = {}    # team_id -> set de player.id ya asignados
-    used_pids: set = set()        # ids de 365 ya enlazados
+    taken: dict[int, set] = {}  # team_id -> set de player.id ya asignados
+    used_pids: set = set()  # ids de 365 ya enlazados
     for p_list in players_by_team.values():
         for p in p_list:
             if p.external_365_id is not None and not force:

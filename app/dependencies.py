@@ -18,6 +18,7 @@ def verify_api_key(api_key: str = Header(..., alias="X-API-Key")):
         raise HTTPException(status_code=403, detail="API Key invalida")
     return api_key
 
+
 def get_or_404(db, model, id_value):
     item = db.query(model).filter(model.id == id_value).first()
     if not item:
@@ -66,10 +67,7 @@ def find_season(db, season=None):
         return latest_season(db)
     s = db.query(models.Season).filter(models.Season.name == season).first()
     if s is None and str(season).isdigit():
-        s = (db.query(models.Season)
-             .filter(models.Season.year == int(season))
-             .order_by(_apertura_first().desc())
-             .first())
+        s = db.query(models.Season).filter(models.Season.year == int(season)).order_by(_apertura_first().desc()).first()
     return s
 
 
@@ -85,6 +83,7 @@ def resolve_season_id(db, season=None):
 def resolve_season_label(db, season=None):
     """Etiqueta de temporada (clave de las tablas de stats: 'Apertura 2026')."""
     from app.season import current_season_name
+
     s = find_season(db, season)
     if s:
         return s.name

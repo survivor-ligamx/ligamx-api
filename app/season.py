@@ -8,6 +8,7 @@ Como ambos torneos caen en el mismo ano, identificar la temporada solo por el
 ano (p. ej. "2026") es ambiguo. Estas funciones resuelven el torneo vigente a
 partir del mes, para etiquetar los datos de forma clara (p. ej. "Apertura 2026").
 """
+
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -42,6 +43,7 @@ def tournament_from_matches(matches):
     """Deduce (torneo, ano) a partir de las fechas REALES de los partidos
     cargados (lo mas robusto). Si no hay fechas, cae a current_tournament()."""
     from collections import Counter
+
     dated = [m.get("match_date") for m in matches if m.get("match_date")]
     if not dated:
         return current_tournament()

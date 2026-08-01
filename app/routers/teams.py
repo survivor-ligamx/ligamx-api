@@ -19,14 +19,17 @@ def _year_from_season(season: str) -> int:
     m = re.search(r"(20\d{2})", season or "")
     return int(m.group(1)) if m else datetime.now().year
 
+
 @router.get("/teams", response_model=list[schemas.TeamResponse])
 def get_teams(limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
     return db.query(models.Team).options(joinedload(models.Team.stadium)).offset(offset).limit(limit).all()
+
 
 @router.get("/teams/search", response_model=list[schemas.TeamResponse])
 def search_teams(q: str, db: Session = Depends(get_db)):
     def norm(s):
         return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn").lower()
+
     query = norm(q)
     return [t for t in db.query(models.Team).all() if query in norm(t.name)]
 
@@ -42,12 +45,7 @@ def teams_xg_performance(
     más efectivos (goles > xG) o desperdician (goles < xG)."""
     label = resolve_season_label(db, season)
     M = models.PlayerMatchStat
-    rows = (
-        db.query(M.team_id, M.team_name, func.sum(M.goals).label("goals"), func.sum(M.xg).label("xg"))
-        .filter(M.season == label)
-        .group_by(M.team_id, M.team_name)
-        .all()
-    )
+    rows = db.query(M.team_id, M.team_name, func.sum(M.goals).label("goals"), func.sum(M.xg).label("xg")).filter(M.season == label).group_by(M.team_id, M.team_name).all()
     out = []
     for team_id, team_name, goals, xg in rows:
         g = int(goals or 0)
@@ -63,15 +61,25 @@ def teams_xg_performance(
 def get_team(team_id: int, db: Session = Depends(get_db)):
     return get_or_404(db, models.Team, team_id)
 
+
 @router.get("/teams/{team_id}/players", response_model=list[schemas.PlayerResponse])
 def get_team_players(team_id: int, db: Session = Depends(get_db)):
     get_or_404(db, models.Team, team_id)
     return db.query(models.Player).filter(models.Player.team_id == team_id).all()
 
+
 @router.get("/teams/{team_id}/last-matches", response_model=list[schemas.MatchResponse])
 def get_team_last_matches(team_id: int, limit: int = Query(5, ge=1, le=20), db: Session = Depends(get_db)):
     get_or_404(db, models.Team, team_id)
-    return db.query(models.Match).options(joinedload(models.Match.home_team), joinedload(models.Match.away_team)).filter((models.Match.home_team_id == team_id) | (models.Match.away_team_id == team_id)).order_by(models.Match.match_date.desc()).limit(limit).all()
+    return (
+        db.query(models.Match)
+        .options(joinedload(models.Match.home_team), joinedload(models.Match.away_team))
+        .filter((models.Match.home_team_id == team_id) | (models.Match.away_team_id == team_id))
+        .order_by(models.Match.match_date.desc())
+        .limit(limit)
+        .all()
+    )
+
 
 @router.get("/teams/{team_id}/stats")
 def get_team_stats(team_id: int, season: str = Query(None), db: Session = Depends(get_db)):
@@ -100,7 +108,6 @@ def get_team_season_stats(team_id: int, season: str = Query(None, description="E
     porterias a cero, goles recibidos, pases completados, tackles, intercepciones,
     duelos, etc.) en categorias defensive/general/goalKeeping/offensive."""
     return ESPNRequestsScraper().get_team_season_stats(team_id, _year_from_season(season))
-
 
 
 @router.get("/teams/{team_id}/form")
@@ -133,14 +140,16 @@ def get_team_form(team_id: int, limit: int = Query(5, ge=1, le=20), db: Session 
             outcome = "D"
         summary[outcome] += 1
         opponent = m.away_team if is_home else m.home_team
-        results.append({
-            "match_id": m.id,
-            "date": m.match_date,
-            "home": is_home,
-            "opponent": opponent.name if opponent else None,
-            "score": f"{gf}-{ga}",
-            "result": outcome,
-        })
+        results.append(
+            {
+                "match_id": m.id,
+                "date": m.match_date,
+                "home": is_home,
+                "opponent": opponent.name if opponent else None,
+                "score": f"{gf}-{ga}",
+                "result": outcome,
+            }
+        )
 
     return {
         "team_id": team_id,
@@ -149,7 +158,6 @@ def get_team_form(team_id: int, limit: int = Query(5, ge=1, le=20), db: Session 
         "form": "".join(r["result"] for r in results),  # type: ignore[misc]
         "matches": results,
     }
-
 
 
 @router.get("/teams/{team_id}/discipline")
@@ -252,19 +260,29 @@ def get_team_profile(team_id: int, season: str = Query(None), db: Session = Depe
 
     standing = None
     if season_id is not None:
-        st = db.query(models.Standing).filter(models.Standing.season_id == season_id,
-                                               models.Standing.team_id == team_id).first()
+        st = db.query(models.Standing).filter(models.Standing.season_id == season_id, models.Standing.team_id == team_id).first()
         if st:
-            standing = {"position": st.position, "points": st.points, "played": st.played,
-                        "won": st.won, "drawn": st.drawn, "lost": st.lost,
-                        "goals_for": st.goals_for, "goals_against": st.goals_against,
-                        "goal_difference": st.goal_difference}
+            standing = {
+                "position": st.position,
+                "points": st.points,
+                "played": st.played,
+                "won": st.won,
+                "drawn": st.drawn,
+                "lost": st.lost,
+                "goals_for": st.goals_for,
+                "goals_against": st.goals_against,
+                "goal_difference": st.goal_difference,
+            }
 
-    finished = (db.query(models.Match)
-                .filter((models.Match.home_team_id == team_id) | (models.Match.away_team_id == team_id),
-                        models.Match.status == "finished",
-                        models.Match.home_score.isnot(None), models.Match.away_score.isnot(None))
-                .order_by(models.Match.match_date.desc()).limit(5).all())
+    finished = (
+        db.query(models.Match)
+        .filter(
+            (models.Match.home_team_id == team_id) | (models.Match.away_team_id == team_id), models.Match.status == "finished", models.Match.home_score.isnot(None), models.Match.away_score.isnot(None)
+        )
+        .order_by(models.Match.match_date.desc())
+        .limit(5)
+        .all()
+    )
     form = ""
     for m in finished:
         gf = m.home_score if m.home_team_id == team_id else m.away_score
@@ -276,24 +294,36 @@ def get_team_profile(team_id: int, season: str = Query(None), db: Session = Depe
     goals = db.query(func.sum(M.goals)).filter(M.team_id == team_id, M.season == label).scalar()
     squad = db.query(func.count(models.Player.id)).filter(models.Player.team_id == team_id).scalar()
 
-    nxt = (db.query(models.Match).options(joinedload(models.Match.home_team), joinedload(models.Match.away_team))
-           .filter((models.Match.home_team_id == team_id) | (models.Match.away_team_id == team_id),
-                   models.Match.match_date >= datetime.now(timezone.utc))
-           .order_by(models.Match.match_date).first())
+    nxt = (
+        db.query(models.Match)
+        .options(joinedload(models.Match.home_team), joinedload(models.Match.away_team))
+        .filter((models.Match.home_team_id == team_id) | (models.Match.away_team_id == team_id), models.Match.match_date >= datetime.now(timezone.utc))
+        .order_by(models.Match.match_date)
+        .first()
+    )
 
     def _brief(m):
         if not m:
             return None
-        return {"id": m.id, "date": m.match_date, "status": m.status,
-                "home": m.home_team.name if m.home_team else None,
-                "away": m.away_team.name if m.away_team else None,
-                "score": {"home": m.home_score, "away": m.away_score}}
+        return {
+            "id": m.id,
+            "date": m.match_date,
+            "status": m.status,
+            "home": m.home_team.name if m.home_team else None,
+            "away": m.away_team.name if m.away_team else None,
+            "score": {"home": m.home_score, "away": m.away_score},
+        }
 
     last = finished[0] if finished else None
     return {
-        "team": {"id": team.id, "name": team.name, "logo_url": team.logo_url,
-                 "city": team.city, "founded": team.founded,
-                 "stadium": {"name": team.stadium.name, "capacity": team.stadium.capacity} if team.stadium else None},
+        "team": {
+            "id": team.id,
+            "name": team.name,
+            "logo_url": team.logo_url,
+            "city": team.city,
+            "founded": team.founded,
+            "stadium": {"name": team.stadium.name, "capacity": team.stadium.capacity} if team.stadium else None,
+        },
         "season": label,
         "standing": standing,
         "form": form,

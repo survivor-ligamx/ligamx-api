@@ -1,4 +1,5 @@
 """Endpoints en vivo basados en 365Scores (datos frescos de Liga MX)."""
+
 from fastapi import APIRouter, Query, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -20,8 +21,7 @@ def _cached_lineups(game_id: int):
 
 @router.get("/matches")
 @cached(60)
-def matches(week: int = Query(None, description="Filtra por jornada (roundNum)"),
-            status: str = Query(None, description="scheduled | live | finished")):
+def matches(week: int = Query(None, description="Filtra por jornada (roundNum)"), status: str = Query(None, description="scheduled | live | finished")):
     data = Scores365Scraper().get_matches()
     if week is not None:
         data = [m for m in data if m.get("week") == week]
@@ -141,8 +141,7 @@ def match_top_performers(game_id: int):
 
 @router.get("/transfers")
 @cached(600)
-def transfers(status: str = Query(None, description="Filtra por estado: confirmado | rumor"),
-              year: int = Query(None, description="Anio del mercado (por defecto el actual, ej. 2026)")):
+def transfers(status: str = Query(None, description="Filtra por estado: confirmado | rumor"), year: int = Query(None, description="Anio del mercado (por defecto el actual, ej. 2026)")):
     """Mercado de fichajes de Liga MX AGRUPADO POR EQUIPO. Para cada equipo
     devuelve sus `altas` (jugadores que entran) y `bajas` (los que salen), con el
     club de origen/destino y el tipo de operacion ("transfer" o "loan"). Los
@@ -170,9 +169,7 @@ def _team_impact(db: Session, team: dict, label: str) -> dict:
     # mas frecuente entre sus stats de la temporada. Robusto ante nombres.
     team_id = None
     if lineup_ids:
-        rows = (db.query(M.team_id, func.count(M.id))
-                .filter(M.season == label, M.player_id.in_(lineup_ids), M.team_id.isnot(None))
-                .group_by(M.team_id).order_by(func.count(M.id).desc()).first())
+        rows = db.query(M.team_id, func.count(M.id)).filter(M.season == label, M.player_id.in_(lineup_ids), M.team_id.isnot(None)).group_by(M.team_id).order_by(func.count(M.id).desc()).first()
         team_id = rows[0] if rows else None
 
     # Nombre del equipo: preferimos el de la BD (mismo texto que ESPN); si no,
@@ -187,10 +184,7 @@ def _team_impact(db: Session, team: dict, label: str) -> dict:
     # Produccion (goles + asistencias) de toda la plantilla del equipo en la temporada.
     prod_by_id, name_by_id = {}, {}
     if team_id is not None:
-        agg = (db.query(M.player_id, M.player_name,
-                        func.sum(M.goals + M.assists).label("prod"))
-               .filter(M.season == label, M.team_id == team_id)
-               .group_by(M.player_id, M.player_name).all())
+        agg = db.query(M.player_id, M.player_name, func.sum(M.goals + M.assists).label("prod")).filter(M.season == label, M.team_id == team_id).group_by(M.player_id, M.player_name).all()
         for pid, pname, prod in agg:
             if pid is None:
                 continue

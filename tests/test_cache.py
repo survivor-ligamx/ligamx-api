@@ -36,10 +36,10 @@ def test_cache_expira():
     assert b != a
 
 
-
 def test_cache_stats_backend_memoria():
     # Sin REDIS_URL, el backend por defecto es 'memory' y reporta entradas.
     from app.cache import cache_stats, cached, clear_cache
+
     clear_cache()
 
     @cached(60)

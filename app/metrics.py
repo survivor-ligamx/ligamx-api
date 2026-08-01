@@ -7,6 +7,7 @@ desglose por familia de codigo (2xx/4xx/5xx), por ruta (con plantilla, p. ej.
 Es por-proceso (suficiente para 1 worker). Para varios workers o monitoreo
 historico, lo natural es exportar a Prometheus/StatsD mas adelante.
 """
+
 import threading
 import time
 from collections import defaultdict
@@ -17,9 +18,9 @@ class Metrics:
         self._lock = threading.Lock()
         self.started_at = time.time()
         self.total = 0
-        self.by_class = defaultdict(int)   # "2xx" -> n
-        self.by_path = defaultdict(int)    # "/standings" -> n
-        self.errors = 0                    # status >= 500
+        self.by_class = defaultdict(int)  # "2xx" -> n
+        self.by_path = defaultdict(int)  # "/standings" -> n
+        self.errors = 0  # status >= 500
         self.latency_count = 0
         self.latency_sum_ms = 0.0
         self.latency_max_ms = 0.0

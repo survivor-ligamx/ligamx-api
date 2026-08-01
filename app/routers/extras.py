@@ -1,4 +1,5 @@
 """Endpoints complementarios: highlights en video y assets de equipos."""
+
 from fastapi import APIRouter
 from app.scrapers import extras_scraper
 from app.cache import cached

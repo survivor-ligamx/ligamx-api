@@ -5,6 +5,7 @@
   proximos). Trae el campo idESPN, que coincide con los IDs de equipo de ESPN.
 - Scorebat: highlights en video (fallback; su API v3 quedo deprecada).
 """
+
 import logging
 from typing import Optional, Dict, List
 import requests
@@ -17,8 +18,7 @@ THESPORTSDB_BASE = f"https://www.thesportsdb.com/api/v1/json/{THESPORTSDB_KEY}"
 THESPORTSDB_TEAMS = f"{THESPORTSDB_BASE}/search_all_teams.php"
 LIGA_MX_LEAGUE_ID = 4350  # "Mexican Primera League" en TheSportsDB
 
-_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
+_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
 
 
 def _get_json(url: str, params: Optional[Dict] = None) -> Dict:
@@ -33,6 +33,7 @@ def _event_to_dict(e: Dict) -> Dict:
             return int(v)
         except (TypeError, ValueError):
             return None
+
     return {
         "event_id": e.get("idEvent"),
         "title": e.get("strEvent"),
@@ -65,14 +66,16 @@ def _scorebat_highlights() -> List[Dict]:
         comp = (item.get("competition") or "").lower()
         if "mexico" not in comp and "liga mx" not in comp:
             continue
-        out.append({
-            "title": item.get("title"),
-            "competition": item.get("competition"),
-            "date": item.get("date"),
-            "thumbnail": item.get("thumbnail"),
-            "video": item.get("matchviewUrl"),
-            "source": "scorebat",
-        })
+        out.append(
+            {
+                "title": item.get("title"),
+                "competition": item.get("competition"),
+                "date": item.get("date"),
+                "thumbnail": item.get("thumbnail"),
+                "video": item.get("matchviewUrl"),
+                "source": "scorebat",
+            }
+        )
     return out
 
 
@@ -120,19 +123,21 @@ def get_team_assets() -> List[Dict]:
     out = []
     for t in data.get("teams", []) or []:
         espn_id = t.get("idESPN")
-        out.append({
-            "espn_team_id": int(espn_id) if espn_id and str(espn_id).isdigit() else None,
-            "name": t.get("strTeam"),
-            "nickname": t.get("strKeywords"),
-            "founded": int(t["intFormedYear"]) if t.get("intFormedYear") and str(t["intFormedYear"]).isdigit() else None,
-            "stadium": t.get("strStadium"),
-            "stadium_capacity": int(t["intStadiumCapacity"]) if t.get("intStadiumCapacity") and str(t["intStadiumCapacity"]).isdigit() else None,
-            "badge": t.get("strBadge"),
-            "jersey": t.get("strEquipment"),
-            "stadium_image": t.get("strStadiumThumb"),
-            "description_es": t.get("strDescriptionES"),
-            "website": t.get("strWebsite"),
-        })
+        out.append(
+            {
+                "espn_team_id": int(espn_id) if espn_id and str(espn_id).isdigit() else None,
+                "name": t.get("strTeam"),
+                "nickname": t.get("strKeywords"),
+                "founded": int(t["intFormedYear"]) if t.get("intFormedYear") and str(t["intFormedYear"]).isdigit() else None,
+                "stadium": t.get("strStadium"),
+                "stadium_capacity": int(t["intStadiumCapacity"]) if t.get("intStadiumCapacity") and str(t["intStadiumCapacity"]).isdigit() else None,
+                "badge": t.get("strBadge"),
+                "jersey": t.get("strEquipment"),
+                "stadium_image": t.get("strStadiumThumb"),
+                "description_es": t.get("strDescriptionES"),
+                "website": t.get("strWebsite"),
+            }
+        )
     return out
 
 

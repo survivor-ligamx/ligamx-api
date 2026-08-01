@@ -1,14 +1,15 @@
 from app.scrapers.base import BaseScraper
 from typing import Optional, List, Dict
 
+
 class DemoScraper(BaseScraper):
     """Scraper de demostración con datos de ejemplo.
     Úsalo para probar la API. Luego lo reemplazas por scrapers reales."""
-    
+
     @property
     def source_name(self):
         return "demo"
-    
+
     def get_stadiums(self) -> List[Dict]:
         return [
             {"id": 1, "name": "Estadio Azteca", "city": "Ciudad de México", "capacity": 87523},
@@ -16,7 +17,7 @@ class DemoScraper(BaseScraper):
             {"id": 3, "name": "Estadio Universitario", "city": "San Nicolás de los Garza", "capacity": 41886},
             {"id": 4, "name": "Estadio BBVA", "city": "Monterrey", "capacity": 51348},
         ]
-    
+
     def get_teams(self) -> List[Dict]:
         return [
             {"id": 1, "name": "Club América", "short_name": "AME", "city": "Ciudad de México", "colors": "Amarillo y Azul", "stadium_name": "Estadio Azteca", "founded": 1916},
@@ -24,7 +25,7 @@ class DemoScraper(BaseScraper):
             {"id": 3, "name": "Tigres UANL", "short_name": "TIG", "city": "San Nicolás de los Garza", "colors": "Azul y Dorado", "stadium_name": "Estadio Universitario", "founded": 1960},
             {"id": 4, "name": "Monterrey", "short_name": "MTY", "city": "Monterrey", "colors": "Azul y Blanco", "stadium_name": "Estadio BBVA", "founded": 1945},
         ]
-    
+
     def get_players(self) -> List[Dict]:
         return [
             {"id": 1, "name": "Henry Martín", "position": "Delantero", "number": 21, "team_name": "Club América", "nationality": "México"},
@@ -33,7 +34,7 @@ class DemoScraper(BaseScraper):
             {"id": 4, "name": "André-Pierre Gignac", "position": "Delantero", "number": 10, "team_name": "Tigres UANL", "nationality": "Francia"},
             {"id": 5, "name": "Sergio Canales", "position": "Mediocampista", "number": 10, "team_name": "Monterrey", "nationality": "España"},
         ]
-    
+
     def get_matches(self, season_id: Optional[int] = None) -> List[Dict]:
         return [
             {"home_team": "Club América", "away_team": "Chivas", "home_score": 2, "away_score": 1, "status": "finished"},
@@ -41,7 +42,7 @@ class DemoScraper(BaseScraper):
             {"home_team": "Chivas", "away_team": "Tigres UANL", "home_score": None, "away_score": None, "status": "scheduled"},
             {"home_team": "Monterrey", "away_team": "Club América", "home_score": None, "away_score": None, "status": "scheduled"},
         ]
-    
+
     def get_standings(self) -> List[Dict]:
         return [
             {"team_name": "Club América", "position": 1, "played": 2, "won": 2, "drawn": 0, "lost": 0, "goals_for": 5, "goals_against": 2, "points": 6},

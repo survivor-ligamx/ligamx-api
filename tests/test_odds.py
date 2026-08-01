@@ -3,10 +3,16 @@
 
 def _snapshot():
     return {
-        "home_team": "América", "away_team": "Chivas", "season": "Apertura 2026",
+        "home_team": "América",
+        "away_team": "Chivas",
+        "season": "Apertura 2026",
         "source": "odds-api.io",
-        "odds_local": 1.80, "odds_empate": 3.40, "odds_visita": 4.20,
-        "ou_linea": 2.5, "odds_over": 1.90, "odds_under": 1.90,
+        "odds_local": 1.80,
+        "odds_empate": 3.40,
+        "odds_visita": 4.20,
+        "ou_linea": 2.5,
+        "odds_over": 1.90,
+        "odds_under": 1.90,
     }
 
 

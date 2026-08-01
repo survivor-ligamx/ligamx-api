@@ -8,6 +8,7 @@ transparente al cache en proceso, asi que nunca rompe.
 Los endpoints cacheados devuelven datos JSON-serializables (dicts/listas de los
 scrapers), por lo que el ida y vuelta por Redis es seguro.
 """
+
 import time
 import threading
 import functools
@@ -29,6 +30,7 @@ REDIS_URL = os.getenv("REDIS_URL")
 if REDIS_URL:
     try:
         import redis as _redis_lib
+
         _redis = _redis_lib.from_url(REDIS_URL, socket_timeout=2, socket_connect_timeout=2)
         _redis.ping()
         logger.info("Cache: backend Redis activo")
@@ -46,6 +48,7 @@ def cached(ttl: int) -> Callable:
     """Decorador: cachea el resultado de la funcion durante `ttl` segundos.
     Los argumentos deben ser hashables/serializables (str/int/None, como los
     query params)."""
+
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
@@ -79,6 +82,7 @@ def cached(ttl: int) -> Callable:
 
         wrapper.__wrapped__ = fn
         return wrapper
+
     return decorator
 
 

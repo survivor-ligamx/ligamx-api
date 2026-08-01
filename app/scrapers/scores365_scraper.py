@@ -7,6 +7,7 @@ fixtures, resultados, tabla, alineaciones con posiciones en cancha, eventos
 
 Competencia Liga MX = 141.
 """
+
 import time
 import logging
 from datetime import datetime, timezone
@@ -76,8 +77,7 @@ def _parse_date(value):
 class Scores365Scraper(BaseScraper):
     def __init__(self):
         self._headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept": "*/*",
             "Referer": "https://www.365scores.com/",
         }
@@ -97,10 +97,10 @@ class Scores365Scraper(BaseScraper):
                 r.raise_for_status()
                 return r.json()  # type: ignore[no-any-return]
             except Exception as e:
-                logger.warning(f"365scores request fallo ({attempt+1}/{retries}): {url} - {e}")
+                logger.warning(f"365scores request fallo ({attempt + 1}/{retries}): {url} - {e}")
                 if attempt == retries - 1:
                     raise
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
         return {}
 
     # ---------- Catalogo base ----------
@@ -118,14 +118,16 @@ class Scores365Scraper(BaseScraper):
                 if not cid or cid in seen:
                     continue
                 seen.add(cid)
-                teams.append({
-                    "id": int(cid),
-                    "name": c.get("name", ""),
-                    "short_name": c.get("symbolicName") or c.get("name", "")[:3].upper(),
-                    "city": None,
-                    "colors": c.get("color"),
-                    "stadium_name": None,
-                })
+                teams.append(
+                    {
+                        "id": int(cid),
+                        "name": c.get("name", ""),
+                        "short_name": c.get("symbolicName") or c.get("name", "")[:3].upper(),
+                        "city": None,
+                        "colors": c.get("color"),
+                        "stadium_name": None,
+                    }
+                )
         return teams
 
     def get_standings(self) -> List[Dict]:
@@ -136,18 +138,20 @@ class Scores365Scraper(BaseScraper):
                 c = row.get("competitor", {})
                 gf = int(row.get("for", 0) or 0)
                 ga = int(row.get("against", 0) or 0)
-                standings.append({
-                    "position": int(row.get("position", i + 1)),
-                    "team_name": c.get("name", ""),
-                    "played": int(row.get("gamePlayed", 0) or 0),
-                    "won": int(row.get("gamesWon", 0) or 0),
-                    "drawn": int(row.get("gamesEven", 0) or 0),
-                    "lost": int(row.get("gamesLost", 0) or 0),
-                    "goals_for": gf,
-                    "goals_against": ga,
-                    "goal_difference": gf - ga,
-                    "points": int(row.get("points", 0) or 0),
-                })
+                standings.append(
+                    {
+                        "position": int(row.get("position", i + 1)),
+                        "team_name": c.get("name", ""),
+                        "played": int(row.get("gamePlayed", 0) or 0),
+                        "won": int(row.get("gamesWon", 0) or 0),
+                        "drawn": int(row.get("gamesEven", 0) or 0),
+                        "lost": int(row.get("gamesLost", 0) or 0),
+                        "goals_for": gf,
+                        "goals_against": ga,
+                        "goal_difference": gf - ga,
+                        "points": int(row.get("points", 0) or 0),
+                    }
+                )
             break  # solo la tabla general
         return standings
 
@@ -182,6 +186,7 @@ class Scores365Scraper(BaseScraper):
             fixtures = self._get_json("games/fixtures/", {"competitions": COMPETITION_ID})
             if current_season is None:
                 from collections import Counter
+
                 counts = Counter(g.get("seasonNum") for g in fixtures.get("games", []) if g.get("seasonNum") is not None)
                 current_season = counts.most_common(1)[0][0] if counts else None
         except Exception as e:
@@ -243,11 +248,7 @@ class Scores365Scraper(BaseScraper):
         home = game.get("homeCompetitor", {}) or {}
         away = game.get("awayCompetitor", {}) or {}
         venue = game.get("venue") or {}
-        officials = [
-            {"name": o.get("name"), "id": o.get("id")}
-            for o in (game.get("officials") or [])
-            if o.get("name")
-        ]
+        officials = [{"name": o.get("name"), "id": o.get("id")} for o in (game.get("officials") or []) if o.get("name")]
         referee = officials[0]["name"] if officials else None
         return {
             "game_id": game_id,
@@ -277,23 +278,27 @@ class Scores365Scraper(BaseScraper):
                 info = members.get(m.get("id"), {})
                 pos = m.get("position", {}) or {}
                 yard = m.get("yardFormation", {}) or {}
-                players.append({
-                    "player_id": int(m["id"]) if m.get("id") else None,
-                    "name": info.get("name") or info.get("shortName"),
-                    "jersey": info.get("jerseyNumber"),
-                    "position": pos.get("name"),
-                    "starter": m.get("status") == 1 or m.get("statusText") == "Starting",
-                    "rating": m.get("ranking"),
-                    "field_line": yard.get("line"),
-                    "field_side": yard.get("fieldSide"),
-                })
-            teams.append({
-                "team_name": c.get("name"),
-                "home_away": "home" if side == "homeCompetitor" else "away",
-                "formation": lu.get("formation"),
-                "status": lu.get("status"),
-                "players": players,
-            })
+                players.append(
+                    {
+                        "player_id": int(m["id"]) if m.get("id") else None,
+                        "name": info.get("name") or info.get("shortName"),
+                        "jersey": info.get("jerseyNumber"),
+                        "position": pos.get("name"),
+                        "starter": m.get("status") == 1 or m.get("statusText") == "Starting",
+                        "rating": m.get("ranking"),
+                        "field_line": yard.get("line"),
+                        "field_side": yard.get("fieldSide"),
+                    }
+                )
+            teams.append(
+                {
+                    "team_name": c.get("name"),
+                    "home_away": "home" if side == "homeCompetitor" else "away",
+                    "formation": lu.get("formation"),
+                    "status": lu.get("status"),
+                    "players": players,
+                }
+            )
         return {"game_id": game_id, "teams": teams}
 
     def get_probable_lineup(self, game_id, game: Optional[Dict] = None) -> Dict:
@@ -318,9 +323,7 @@ class Scores365Scraper(BaseScraper):
             mem = lu.get("members") or []
             sn = (lu.get("status") or "").lower().replace(" ", "")
             confirmed = sn.startswith("confirm")  # confirmed / confirmada / confirmado
-            not_confirmed = (sn.startswith("notconfirm") or sn.startswith("sinconfirm")
-                             or sn.startswith("probable") or sn.startswith("expected")
-                             or sn.startswith("esperad"))
+            not_confirmed = sn.startswith("notconfirm") or sn.startswith("sinconfirm") or sn.startswith("probable") or sn.startswith("expected") or sn.startswith("esperad")
             if mem and confirmed:
                 any_confirmed = True
             if not (mem and not_confirmed):
@@ -332,28 +335,28 @@ class Scores365Scraper(BaseScraper):
                     continue
                 info = members.get(m.get("id"), {})
                 pos = m.get("position", {}) or {}
-                starters.append({
-                    "player_id": int(m["id"]) if m.get("id") else None,
-                    "name": info.get("name") or info.get("shortName"),
-                    "jersey": info.get("jerseyNumber"),
-                    "position": pos.get("name"),
-                })
-            teams.append({
-                "equipo": c.get("name"),
-                "condicion": "local" if side == "homeCompetitor" else "visitante",
-                "formacion": lu.get("formation"),
-                "confirmada": False,
-                "titulares_probables": starters,
-            })
+                starters.append(
+                    {
+                        "player_id": int(m["id"]) if m.get("id") else None,
+                        "name": info.get("name") or info.get("shortName"),
+                        "jersey": info.get("jerseyNumber"),
+                        "position": pos.get("name"),
+                    }
+                )
+            teams.append(
+                {
+                    "equipo": c.get("name"),
+                    "condicion": "local" if side == "homeCompetitor" else "visitante",
+                    "formacion": lu.get("formation"),
+                    "confirmada": False,
+                    "titulares_probables": starters,
+                }
+            )
 
         if any_probable:
-            return {"disponible": True, "fuente": "365scores",
-                    "game_id": game_id, "equipos": teams}
-        motivo = ("El XI ya esta confirmado; usa /365scores/matches/{id}/lineups"
-                  if any_confirmed else
-                  "365Scores aun no publica el XI probable de este partido")
-        return {"disponible": False, "fuente": "365scores",
-                "game_id": game_id, "motivo": motivo, "equipos": []}
+            return {"disponible": True, "fuente": "365scores", "game_id": game_id, "equipos": teams}
+        motivo = "El XI ya esta confirmado; usa /365scores/matches/{id}/lineups" if any_confirmed else "365Scores aun no publica el XI probable de este partido"
+        return {"disponible": False, "fuente": "365scores", "game_id": game_id, "motivo": motivo, "equipos": []}
 
     def get_match_events(self, game_id) -> List[Dict]:
         """Eventos: goles, tarjetas (amarilla/roja), cambios y goles anulados."""
@@ -372,20 +375,21 @@ class Scores365Scraper(BaseScraper):
         events = []
         for e in game.get("events", []):
             et = e.get("eventType", {}) or {}
-            events.append({
-                "category": cat_map.get(et.get("id"), "other"),  # type: ignore[arg-type]
-                "type": et.get("name"),
-                "subtype": et.get("subTypeName"),
-                "minute": e.get("gameTimeDisplay") or (f"{int(e['gameTime'])}'" if e.get("gameTime") else None),
-                "team_name": team_by_id.get(e.get("competitorId")),
-                "player": members.get(e.get("playerId")),
-                "is_major": e.get("isMajor", False),
-            })
+            events.append(
+                {
+                    "category": cat_map.get(et.get("id"), "other"),  # type: ignore[arg-type]
+                    "type": et.get("name"),
+                    "subtype": et.get("subTypeName"),
+                    "minute": e.get("gameTimeDisplay") or (f"{int(e['gameTime'])}'" if e.get("gameTime") else None),
+                    "team_name": team_by_id.get(e.get("competitorId")),
+                    "player": members.get(e.get("playerId")),
+                    "is_major": e.get("isMajor", False),
+                }
+            )
         return events
 
     def get_match_cards(self, game_id) -> List[Dict]:
-        return [e for e in self.get_match_events(game_id)
-                if e["category"] in ("yellow_card", "red_card")]
+        return [e for e in self.get_match_events(game_id) if e["category"] in ("yellow_card", "red_card")]
 
     # ---------- Joyitas: estadisticas por jugador ----------
     def get_match_player_stats(self, game_id, game: Optional[Dict] = None) -> Dict:
@@ -412,23 +416,27 @@ class Scores365Scraper(BaseScraper):
                 # dos dicts: por nombre (consumo humano) y por type (parseo robusto).
                 stats = {s.get("name"): s.get("value") for s in raw_stats if s.get("name")}
                 stats_by_type = {s.get("type"): s.get("value") for s in raw_stats if s.get("type") is not None}
-                players.append({
-                    "player_id": int(m["id"]) if m.get("id") else None,
-                    "name": info.get("name") or info.get("shortName"),
-                    "jersey": info.get("jerseyNumber"),
-                    "position": pos.get("name"),
-                    "starter": m.get("status") == 1 or m.get("statusText") == "Starting",
-                    "rating": m.get("ranking"),
-                    "stats": stats,
-                    "stats_by_type": stats_by_type,
-                })
-            teams.append({
-                "team_id": int(c["id"]) if c.get("id") else None,
-                "team_name": c.get("name"),
-                "home_away": "home" if side == "homeCompetitor" else "away",
-                "formation": lu.get("formation"),
-                "players": players,
-            })
+                players.append(
+                    {
+                        "player_id": int(m["id"]) if m.get("id") else None,
+                        "name": info.get("name") or info.get("shortName"),
+                        "jersey": info.get("jerseyNumber"),
+                        "position": pos.get("name"),
+                        "starter": m.get("status") == 1 or m.get("statusText") == "Starting",
+                        "rating": m.get("ranking"),
+                        "stats": stats,
+                        "stats_by_type": stats_by_type,
+                    }
+                )
+            teams.append(
+                {
+                    "team_id": int(c["id"]) if c.get("id") else None,
+                    "team_name": c.get("name"),
+                    "home_away": "home" if side == "homeCompetitor" else "away",
+                    "formation": lu.get("formation"),
+                    "players": players,
+                }
+            )
         return {"game_id": game_id, "teams": teams}
 
     def _season_leaders(self, key: str) -> List[Dict]:
@@ -439,15 +447,17 @@ class Scores365Scraper(BaseScraper):
             for row in c.get("rows", []):
                 e = row.get("entity", {}) or {}
                 value = (row.get("stats") or [{}])[0].get("value")
-                rows.append({
-                    "rank": (row.get("position", 0) or 0) + 1,
-                    "id": int(e["id"]) if e.get("id") else None,
-                    "name": e.get("name"),
-                    "team_id": int(e["competitorId"]) if e.get("competitorId") else None,
-                    "position": e.get("positionName"),
-                    "value": value,
-                    "note": row.get("secondaryStatName"),
-                })
+                rows.append(
+                    {
+                        "rank": (row.get("position", 0) or 0) + 1,
+                        "id": int(e["id"]) if e.get("id") else None,
+                        "name": e.get("name"),
+                        "team_id": int(e["competitorId"]) if e.get("competitorId") else None,
+                        "position": e.get("positionName"),
+                        "value": value,
+                        "note": row.get("secondaryStatName"),
+                    }
+                )
             out.append({"category_id": c.get("id"), "category": c.get("name"), "leaders": rows})
         return out
 
@@ -467,7 +477,6 @@ class Scores365Scraper(BaseScraper):
         if category_id is not None:
             leaders = [c for c in leaders if c.get("category_id") == category_id]
         return leaders
-
 
     def get_match_shots(self, game_id, game: Optional[Dict] = None) -> Dict:
         """Mapa de tiros con xG del partido (de chartEvents): cada disparo con su
@@ -489,8 +498,7 @@ class Scores365Scraper(BaseScraper):
             except (TypeError, ValueError):
                 return None
 
-        totals = {1: {"shots": 0, "xg": 0.0, "xgot": 0.0, "goals": 0},
-                  2: {"shots": 0, "xg": 0.0, "xgot": 0.0, "goals": 0}}
+        totals = {1: {"shots": 0, "xg": 0.0, "xgot": 0.0, "goals": 0}, 2: {"shots": 0, "xg": 0.0, "xgot": 0.0, "goals": 0}}
         shots = []
         for e in events:
             cn = e.get("competitorNum")
@@ -499,21 +507,23 @@ class Scores365Scraper(BaseScraper):
             is_goal = bool(outcome_name and outcome_name.lower().startswith("gol"))
             xg = _f(e.get("xg"))
             xgot = _f(e.get("xgot"))
-            shots.append({
-                "minute": e.get("time"),
-                "team": team_name.get(cn),
-                "side": team_side.get(cn),
-                "player": members.get(e.get("playerId")),
-                "player_id": e.get("playerId"),
-                "xg": xg,
-                "xgot": xgot,
-                "body_part": e.get("bodyPart"),
-                "placement": e.get("goalDescription"),
-                "outcome": outcome_name,
-                "is_goal": is_goal,
-                "x": e.get("line"),
-                "y": e.get("side"),
-            })
+            shots.append(
+                {
+                    "minute": e.get("time"),
+                    "team": team_name.get(cn),
+                    "side": team_side.get(cn),
+                    "player": members.get(e.get("playerId")),
+                    "player_id": e.get("playerId"),
+                    "xg": xg,
+                    "xgot": xgot,
+                    "body_part": e.get("bodyPart"),
+                    "placement": e.get("goalDescription"),
+                    "outcome": outcome_name,
+                    "is_goal": is_goal,
+                    "x": e.get("line"),
+                    "y": e.get("side"),
+                }
+            )
             if cn in totals:
                 t = totals[cn]
                 t["shots"] += 1
@@ -524,8 +534,7 @@ class Scores365Scraper(BaseScraper):
 
         def _team_total(cn):
             t = totals[cn]
-            return {"shots": t["shots"], "xg": round(t["xg"], 2),
-                    "xgot": round(t["xgot"], 2), "goals": t["goals"]}
+            return {"shots": t["shots"], "xg": round(t["xg"], 2), "xgot": round(t["xgot"], 2), "goals": t["goals"]}
 
         return {
             "game_id": game_id,
@@ -552,13 +561,14 @@ class Scores365Scraper(BaseScraper):
 
         categories = []
         for c in tp.get("categories", []):
-            categories.append({
-                "category": c.get("name"),
-                "home": _player(c.get("homePlayer")),
-                "away": _player(c.get("awayPlayer")),
-            })
+            categories.append(
+                {
+                    "category": c.get("name"),
+                    "home": _player(c.get("homePlayer")),
+                    "away": _player(c.get("awayPlayer")),
+                }
+            )
         return {"game_id": game_id, "categories": categories}
-
 
     def get_news(self, limit: int = 30) -> List[Dict]:
         """Noticias de Liga MX desde 365Scores (feed propio, especifico de la
@@ -570,16 +580,17 @@ class Scores365Scraper(BaseScraper):
             return []
         out = []
         for n in data.get("news", []) or []:
-            out.append({
-                "id": n.get("id"),
-                "title": n.get("title"),
-                "url": n.get("url"),
-                "image": n.get("image"),
-                "published_at": n.get("publishDate"),
-                "is_magazine": bool(n.get("isMagazine")),
-            })
+            out.append(
+                {
+                    "id": n.get("id"),
+                    "title": n.get("title"),
+                    "url": n.get("url"),
+                    "image": n.get("image"),
+                    "published_at": n.get("publishDate"),
+                    "is_magazine": bool(n.get("isMagazine")),
+                }
+            )
         return out[:limit]
-
 
     def get_goalkeepers(self) -> List[Dict]:
         """Tabla de porteros de la temporada (de 365Scores stats): vallas invictas
@@ -597,12 +608,18 @@ class Scores365Scraper(BaseScraper):
                 pid = e.get("id")
                 if not pid:
                     continue
-                g = gks.setdefault(int(pid), {
-                    "player_id": int(pid), "name": e.get("name"),
-                    "team_id": int(e["competitorId"]) if e.get("competitorId") else None,
-                    "clean_sheets": None, "goals_conceded": None,
-                    "saves": None, "penalties_saved": None,
-                })
+                g = gks.setdefault(
+                    int(pid),
+                    {
+                        "player_id": int(pid),
+                        "name": e.get("name"),
+                        "team_id": int(e["competitorId"]) if e.get("competitorId") else None,
+                        "clean_sheets": None,
+                        "goals_conceded": None,
+                        "saves": None,
+                        "penalties_saved": None,
+                    },
+                )
                 g[key] = (row.get("stats") or [{}])[0].get("value")
         out = list(gks.values())
 
@@ -611,6 +628,7 @@ class Scores365Scraper(BaseScraper):
                 return int(v)
             except (TypeError, ValueError):
                 return -1
+
         out.sort(key=lambda g: _cs(g.get("clean_sheets")), reverse=True)
         return out
 
@@ -631,6 +649,7 @@ class Scores365Scraper(BaseScraper):
         Si 365Scores no expone transferencias, devuelve equipos vacio y
         "disponible": false (el proyecto no fabrica datos)."""
         from app.season import current_season_name
+
         season = current_season_name()
         if year is None:
             year = datetime.now(timezone.utc).year
@@ -680,17 +699,21 @@ class Scores365Scraper(BaseScraper):
                 continue
             tipo = _tipo(t)
             if _is_ligamx(target):
-                _bucket(_team_name(target))["altas"].append({
-                    "jugador": jugador,
-                    "desde": _team_name(origin),
-                    "tipo": tipo,
-                })
+                _bucket(_team_name(target))["altas"].append(
+                    {
+                        "jugador": jugador,
+                        "desde": _team_name(origin),
+                        "tipo": tipo,
+                    }
+                )
             if _is_ligamx(origin):
-                _bucket(_team_name(origin))["bajas"].append({
-                    "jugador": jugador,
-                    "hacia": _team_name(target),
-                    "tipo": tipo,
-                })
+                _bucket(_team_name(origin))["bajas"].append(
+                    {
+                        "jugador": jugador,
+                        "hacia": _team_name(target),
+                        "tipo": tipo,
+                    }
+                )
 
         equipos = {k: equipos[k] for k in sorted(equipos)}
         return {"season": season, "disponible": bool(equipos), "equipos": equipos}
@@ -711,16 +734,20 @@ class Scores365Scraper(BaseScraper):
                     continue
                 info = members.get(m.get("id"), {})
                 pos = m.get("position", {}) or {}
-                players.append({
-                    "player_id": int(m["id"]) if m.get("id") else None,
-                    "name": info.get("name") or info.get("shortName"),
-                    "position": pos.get("name"),
-                    "heatmap_url": hm,
-                })
-            teams.append({
-                "team_id": int(c["id"]) if c.get("id") else None,
-                "team_name": c.get("name"),
-                "home_away": "home" if side == "homeCompetitor" else "away",
-                "players": players,
-            })
+                players.append(
+                    {
+                        "player_id": int(m["id"]) if m.get("id") else None,
+                        "name": info.get("name") or info.get("shortName"),
+                        "position": pos.get("name"),
+                        "heatmap_url": hm,
+                    }
+                )
+            teams.append(
+                {
+                    "team_id": int(c["id"]) if c.get("id") else None,
+                    "team_name": c.get("name"),
+                    "home_away": "home" if side == "homeCompetitor" else "away",
+                    "players": players,
+                }
+            )
         return {"game_id": game_id, "teams": teams}

@@ -16,7 +16,7 @@ _MAX_GOALS = 8
 
 
 def _poisson_pmf(k: int, lam: float) -> float:
-    return math.exp(-lam) * (lam ** k) / math.factorial(k)
+    return math.exp(-lam) * (lam**k) / math.factorial(k)
 
 
 @router.get("/seasons")
@@ -28,26 +28,28 @@ def list_seasons(db: Session = Depends(get_db)):
     out = []
     for s in seasons:
         matches = db.query(func.count(models.Match.id)).filter(models.Match.season_id == s.id).scalar()
-        out.append({
-            "id": s.id, "name": s.name, "year": s.year,
-            "tournament": s.tournament_type, "matches": matches,
-            "is_current": bool(current and current.id == s.id),
-        })
+        out.append(
+            {
+                "id": s.id,
+                "name": s.name,
+                "year": s.year,
+                "tournament": s.tournament_type,
+                "matches": matches,
+                "is_current": bool(current and current.id == s.id),
+            }
+        )
     return out
 
 
 def _season_summary(db, s):
     """Resumen agregado de una temporada para comparar."""
-    standings = (db.query(models.Standing).options(joinedload(models.Standing.team))
-                 .filter(models.Standing.season_id == s.id)
-                 .order_by(models.Standing.position).all())
+    standings = db.query(models.Standing).options(joinedload(models.Standing.team)).filter(models.Standing.season_id == s.id).order_by(models.Standing.position).all()
     leader = standings[0] if standings else None
     matches = db.query(models.Match).filter(models.Match.season_id == s.id).all()
     finished = [m for m in matches if m.status == "finished" and m.home_score is not None]
     total_goals = sum((m.home_score or 0) + (m.away_score or 0) for m in finished)
     played = len(finished)
-    top = (db.query(models.TopScorer).filter(models.TopScorer.season == s.name)
-           .order_by(models.TopScorer.goals.desc()).first())
+    top = db.query(models.TopScorer).filter(models.TopScorer.season == s.name).order_by(models.TopScorer.goals.desc()).first()
     return {
         "season": s.name,
         "year": s.year,
@@ -57,13 +59,24 @@ def _season_summary(db, s):
         "matches_played": played,
         "goals_total": total_goals,
         "goals_per_match": round(total_goals / played, 2) if played else 0.0,
-        "standings_leader": ({
-            "team": leader.team.name if leader.team else None,
-            "points": leader.points, "played": leader.played,
-        } if leader else None),
-        "top_scorer": ({
-            "player": top.player, "team": top.team, "goals": top.goals,
-        } if top else None),
+        "standings_leader": (
+            {
+                "team": leader.team.name if leader.team else None,
+                "points": leader.points,
+                "played": leader.played,
+            }
+            if leader
+            else None
+        ),
+        "top_scorer": (
+            {
+                "player": top.player,
+                "team": top.team,
+                "goals": top.goals,
+            }
+            if top
+            else None
+        ),
     }
 
 
@@ -91,6 +104,7 @@ def get_standings(season: str = Query(None, description="Etiqueta ('Apertura 202
         q = q.filter(models.Standing.season_id == season_id)
     return q.order_by(models.Standing.position).all()
 
+
 @router.get("/standings/projection")
 def standings_projection(season: str = Query(None), db: Session = Depends(get_db)):
     """Proyeccion de la tabla FINAL: a los puntos actuales de cada equipo se le
@@ -102,8 +116,7 @@ def standings_projection(season: str = Query(None), db: Session = Depends(get_db
     if season_id is None:
         raise HTTPException(status_code=404, detail="No hay temporadas cargadas")
 
-    standings = (db.query(models.Standing).options(joinedload(models.Standing.team))
-                 .filter(models.Standing.season_id == season_id).all())
+    standings = db.query(models.Standing).options(joinedload(models.Standing.team)).filter(models.Standing.season_id == season_id).all()
     played = [s for s in standings if s.played and s.played > 0]
     if len(played) < 2:
         raise HTTPException(status_code=400, detail="No hay suficientes partidos jugados para proyectar")
@@ -120,12 +133,9 @@ def standings_projection(season: str = Query(None), db: Session = Depends(get_db
     def dfn(s):
         return (s.goals_against / s.played) / avg_gf if s.played else 1.0
 
-    proj = {s.team_id: {"team": s.team, "current_points": s.points, "current_position": s.position,
-                        "projected_points": float(s.points), "remaining_matches": 0} for s in standings}
+    proj = {s.team_id: {"team": s.team, "current_points": s.points, "current_position": s.position, "projected_points": float(s.points), "remaining_matches": 0} for s in standings}
 
-    remaining = (db.query(models.Match)
-                 .filter(models.Match.season_id == season_id, models.Match.status != "finished")
-                 .all())
+    remaining = db.query(models.Match).filter(models.Match.season_id == season_id, models.Match.status != "finished").all()
     for m in remaining:
         sh, sa = by_team.get(m.home_team_id), by_team.get(m.away_team_id)
         if not sh or not sa or not sh.played or not sa.played:
@@ -151,15 +161,17 @@ def standings_projection(season: str = Query(None), db: Session = Depends(get_db
 
     out = []
     for v in proj.values():
-        out.append({
-            "team_id": v["team"].id if v["team"] else None,
-            "team": v["team"].name if v["team"] else None,
-            "logo_url": v["team"].logo_url if v["team"] else None,
-            "current_points": v["current_points"],
-            "current_position": v["current_position"],
-            "remaining_matches": v["remaining_matches"],
-            "projected_points": round(v["projected_points"], 1),
-        })
+        out.append(
+            {
+                "team_id": v["team"].id if v["team"] else None,
+                "team": v["team"].name if v["team"] else None,
+                "logo_url": v["team"].logo_url if v["team"] else None,
+                "current_points": v["current_points"],
+                "current_position": v["current_position"],
+                "remaining_matches": v["remaining_matches"],
+                "projected_points": round(v["projected_points"], 1),
+            }
+        )
     out.sort(key=lambda r: r["projected_points"], reverse=True)
     for i, r in enumerate(out):
         r["projected_position"] = i + 1
@@ -179,15 +191,12 @@ def get_top_scorers(db: Session = Depends(get_db), limit: int = Query(20, ge=1, 
 @router.get("/liguilla")
 def get_liguilla(season: str = Query(None), db: Session = Depends(get_db)):
     """Foto de la clasificacion segun el formato de Liga MX:
-      - Liguilla directa: posiciones 1-6
-      - Play-In: posiciones 7-10
-      - Eliminados: 11 en adelante
+    - Liguilla directa: posiciones 1-6
+    - Play-In: posiciones 7-10
+    - Eliminados: 11 en adelante
     """
     season_id = resolve_season_id(db, season)
-    q = (
-        db.query(models.Standing)
-        .options(joinedload(models.Standing.team))
-    )
+    q = db.query(models.Standing).options(joinedload(models.Standing.team))
     if season_id is not None:
         q = q.filter(models.Standing.season_id == season_id)
     rows = q.order_by(models.Standing.position).all()
@@ -251,10 +260,7 @@ def liguilla_results(season: str = Query(None), db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No hay temporadas cargadas")
 
     matches = (
-        db.query(models.Match)
-        .options(joinedload(models.Match.home_team), joinedload(models.Match.away_team))
-        .filter(models.Match.season_id == season_id, models.Match.status == "finished")
-        .all()
+        db.query(models.Match).options(joinedload(models.Match.home_team), joinedload(models.Match.away_team)).filter(models.Match.season_id == season_id, models.Match.status == "finished").all()
     )
 
     series: dict[Any, Any] = {}
@@ -263,20 +269,34 @@ def liguilla_results(season: str = Query(None), db: Session = Depends(get_db)):
         if not phase or m.home_team_id is None or m.away_team_id is None:
             continue
         key = (order, frozenset([m.home_team_id, m.away_team_id]))
-        s = series.setdefault(key, {
-            "phase": phase, "phase_label": phase_label, "order": order,
-            "aggregate": {}, "names": {}, "legs": [],
-        })
+        s = series.setdefault(
+            key,
+            {
+                "phase": phase,
+                "phase_label": phase_label,
+                "order": order,
+                "aggregate": {},
+                "names": {},
+                "legs": [],
+            },
+        )
         s["aggregate"][m.home_team_id] = s["aggregate"].get(m.home_team_id, 0) + (m.home_score or 0)
         s["aggregate"][m.away_team_id] = s["aggregate"].get(m.away_team_id, 0) + (m.away_score or 0)
         s["names"][m.home_team_id] = m.home_team.name if m.home_team else None
         s["names"][m.away_team_id] = m.away_team.name if m.away_team else None
-        s["legs"].append({
-            "match_id": m.id, "date": m.match_date, "round_name": m.round_name,
-            "home_team_id": m.home_team_id, "home_team": m.home_team.name if m.home_team else None,
-            "away_team_id": m.away_team_id, "away_team": m.away_team.name if m.away_team else None,
-            "home_score": m.home_score, "away_score": m.away_score,
-        })
+        s["legs"].append(
+            {
+                "match_id": m.id,
+                "date": m.match_date,
+                "round_name": m.round_name,
+                "home_team_id": m.home_team_id,
+                "home_team": m.home_team.name if m.home_team else None,
+                "away_team_id": m.away_team_id,
+                "away_team": m.away_team.name if m.away_team else None,
+                "home_score": m.home_score,
+                "away_score": m.away_score,
+            }
+        )
 
     out = []
     for (order, _teams), s in series.items():
@@ -289,17 +309,19 @@ def liguilla_results(season: str = Query(None), db: Session = Depends(get_db)):
             if ga != gb:
                 winner_id = a if ga > gb else b
                 decided = True
-        out.append({
-            "phase": s["phase"],
-            "phase_label": s["phase_label"],
-            "order": s["order"],
-            "teams": [{"team_id": t, "team": s["names"].get(t), "aggregate": s["aggregate"][t]} for t in tids],
-            "legs": sorted(s["legs"], key=lambda x: (x["date"] is None, x["date"])),
-            "winner_team_id": winner_id,
-            "winner": s["names"].get(winner_id) if winner_id else None,
-            "decided": decided,
-            "note": None if decided else "Serie sin definir o empate global (se resuelve por posicion/penales)",
-        })
+        out.append(
+            {
+                "phase": s["phase"],
+                "phase_label": s["phase_label"],
+                "order": s["order"],
+                "teams": [{"team_id": t, "team": s["names"].get(t), "aggregate": s["aggregate"][t]} for t in tids],
+                "legs": sorted(s["legs"], key=lambda x: (x["date"] is None, x["date"])),
+                "winner_team_id": winner_id,
+                "winner": s["names"].get(winner_id) if winner_id else None,
+                "decided": decided,
+                "note": None if decided else "Serie sin definir o empate global (se resuelve por posicion/penales)",
+            }
+        )
     out.sort(key=lambda r: r["order"])
 
     by_phase: dict[str, Any] = {}
@@ -311,9 +333,7 @@ def liguilla_results(season: str = Query(None), db: Session = Depends(get_db)):
         "has_playoff_data": len(out) > 0,
         "series_count": len(out),
         "phases": by_phase,
-        "note": ("Datos reales de la Liguilla." if out else
-                 "Aun no hay partidos de fase final cargados para esta temporada "
-                 "(la Liguilla se juega al cierre del torneo)."),
+        "note": ("Datos reales de la Liguilla." if out else "Aun no hay partidos de fase final cargados para esta temporada (la Liguilla se juega al cierre del torneo)."),
     }
 
 
@@ -350,12 +370,9 @@ def get_liguilla_bracket(season: str = Query(None), db: Session = Depends(get_db
         return by_pos.get(p)
 
     play_in = {
-        "game_1": {"label": "7º vs 8º", "home": at(7), "away": at(8),
-                   "reward": "El ganador clasifica como 7º de la Liguilla"},
-        "game_2": {"label": "9º vs 10º", "home": at(9), "away": at(10),
-                   "reward": "El perdedor queda eliminado"},
-        "game_3": {"label": "Perdedor del Juego 1 vs Ganador del Juego 2",
-                   "reward": "El ganador clasifica como 8º de la Liguilla"},
+        "game_1": {"label": "7º vs 8º", "home": at(7), "away": at(8), "reward": "El ganador clasifica como 7º de la Liguilla"},
+        "game_2": {"label": "9º vs 10º", "home": at(9), "away": at(10), "reward": "El perdedor queda eliminado"},
+        "game_3": {"label": "Perdedor del Juego 1 vs Ganador del Juego 2", "reward": "El ganador clasifica como 8º de la Liguilla"},
     }
     quarterfinals = [
         {"series": "C1", "matchup": "1º vs 8º", "high_seed": at(1), "low_seed": "8º (vía Play-In)"},
