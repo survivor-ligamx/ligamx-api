@@ -9,7 +9,6 @@ Fuentes:
 - Google Noticias (busqueda "Liga MX") -> agrega muchos medios mexicanos.
 - ESPN Deportes (futbol mexicano).
 """
-
 from datetime import datetime
 from time import mktime
 from typing import List, Dict, Optional
@@ -82,16 +81,14 @@ def fetch_news(limit: int = 50) -> List[Dict]:
             if isinstance(src, dict) and src.get("title"):
                 real_source = _clean(src["title"])
 
-            news.append(
-                {
-                    "title": title,
-                    "link": link,
-                    "description": _clean(entry.get("summary", ""))[:500] or title,
-                    "source": real_source,
-                    "image_url": _entry_image(entry),
-                    "published_at": _published_to_dt(entry),
-                }
-            )
+            news.append({
+                "title": title,
+                "link": link,
+                "description": _clean(entry.get("summary", ""))[:500] or title,
+                "source": real_source,
+                "image_url": _entry_image(entry),
+                "published_at": _published_to_dt(entry),
+            })
 
     # Mas recientes primero (los que no traen fecha van al final)
     news.sort(key=lambda n: n["published_at"] or datetime.min, reverse=True)

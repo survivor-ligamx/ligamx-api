@@ -8,7 +8,6 @@ Uso desde el navegador:
     const es = new EventSource("/live/stream");
     es.addEventListener("live", e => console.log(JSON.parse(e.data)));
 """
-
 import asyncio
 import json
 import time

@@ -1,5 +1,4 @@
 from dotenv import load_dotenv
-
 load_dotenv()
 
 import os
@@ -46,17 +45,14 @@ except Exception:  # pragma: no cover - nunca debe impedir el arranque
 
 scheduler = BackgroundScheduler()
 
-
 def auto_sync():
     python = sys.executable
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     subprocess.run([python, "sync.py"], cwd=project_root)
 
-
 if os.getenv("RUN_SCHEDULER", "false").lower() == "true":
     scheduler.add_job(auto_sync, "interval", hours=6)
     scheduler.start()
-
 
 def _unique_route_id(route) -> str:
     """operationId unico por ruta (necesario porque cada router se monta dos
@@ -138,23 +134,10 @@ app.add_middleware(
 # clientes actuales) y bajo el prefijo /v1 (version estable para evolucionar sin
 # romper a nadie). Asi, p. ej., /standings y /v1/standings devuelven lo mismo.
 ROUTERS = [
-    health.router,
-    teams.router,
-    matches.router,
-    standings.router,
-    stadiums.router,
-    players.router,
-    stats.router,
-    news.router,
-    sync.router,
-    sofascore.router,
-    scores365.router,
-    extras.router,
-    search.router,
-    live.router,
-    analytics.router,
-    overview.router,
-    odds.router,
+    health.router, teams.router, matches.router, standings.router, stadiums.router,
+    players.router, stats.router, news.router, sync.router, sofascore.router,
+    scores365.router, extras.router, search.router, live.router, analytics.router,
+    overview.router, odds.router,
 ]
 
 for _r in ROUTERS:

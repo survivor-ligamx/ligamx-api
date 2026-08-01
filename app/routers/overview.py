@@ -1,6 +1,5 @@
 """Vista de resumen ('dashboard'): todo lo clave de la temporada en UNA llamada.
 Ideal para la pantalla principal de una app o un bot."""
-
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
@@ -39,19 +38,26 @@ def dashboard(season: str = Query(None), db: Session = Depends(get_db)):
 
     leader = None
     if season_id is not None:
-        st = db.query(models.Standing).options(joinedload(models.Standing.team)).filter(models.Standing.season_id == season_id).order_by(models.Standing.position).first()
+        st = (db.query(models.Standing).options(joinedload(models.Standing.team))
+              .filter(models.Standing.season_id == season_id)
+              .order_by(models.Standing.position).first())
         if st:
-            leader = {"position": st.position, "team": _team_brief(st.team), "points": st.points, "played": st.played}
+            leader = {"position": st.position, "team": _team_brief(st.team),
+                      "points": st.points, "played": st.played}
 
-    scorer = db.query(models.TopScorer).filter(models.TopScorer.season == label).order_by(models.TopScorer.goals.desc()).first()
+    scorer = (db.query(models.TopScorer)
+              .filter(models.TopScorer.season == label)
+              .order_by(models.TopScorer.goals.desc()).first())
     top_scorer = {"player": scorer.player, "team": scorer.team, "goals": scorer.goals} if scorer else None
 
     mq = db.query(models.Match).options(joinedload(models.Match.home_team), joinedload(models.Match.away_team))
     if season_id is not None:
         mq = mq.filter(models.Match.season_id == season_id)
 
-    upcoming = mq.filter(models.Match.match_date >= now).order_by(models.Match.match_date).limit(5).all()
-    recent = mq.filter(models.Match.status == "finished").order_by(models.Match.match_date.desc()).limit(5).all()
+    upcoming = (mq.filter(models.Match.match_date >= now)
+                .order_by(models.Match.match_date).limit(5).all())
+    recent = (mq.filter(models.Match.status == "finished")
+              .order_by(models.Match.match_date.desc()).limit(5).all())
     news = db.query(models.News).order_by(models.News.published_at.desc().nullslast()).limit(5).all()
 
     return {
@@ -60,5 +66,9 @@ def dashboard(season: str = Query(None), db: Session = Depends(get_db)):
         "top_scorer": top_scorer,
         "upcoming_matches": [_match_brief(m) for m in upcoming],
         "recent_results": [_match_brief(m) for m in recent],
-        "latest_news": [{"title": n.title, "url": n.link, "image": n.image_url, "source": n.source, "published_at": n.published_at} for n in news],
+        "latest_news": [
+            {"title": n.title, "url": n.link, "image": n.image_url,
+             "source": n.source, "published_at": n.published_at}
+            for n in news
+        ],
     }

@@ -6,7 +6,6 @@ password). Si dos entornos muestran la MISMA huella, apuntan a la misma base.
 Esto permite verificar que el secret DATABASE_URL de Actions coincide con el
 DATABASE_URL del web service, sin filtrar la cadena de conexion.
 """
-
 import hashlib
 import os
 from urllib.parse import urlparse
@@ -46,6 +45,8 @@ def db_fingerprint(url: Optional[str] = None) -> str:
     """Huella corta y estable de host+dbname (sin credenciales). Segura para
     exponer en una API publica: no revela host ni usuario, solo permite comparar
     si dos entornos apuntan a la misma base."""
-    dialect, host, dbname = _normalize(url if url is not None else os.environ.get("DATABASE_URL", "sqlite:///./ligamx.db"))
+    dialect, host, dbname = _normalize(
+        url if url is not None else os.environ.get("DATABASE_URL", "sqlite:///./ligamx.db")
+    )
     raw = f"{dialect}://{host or ''}/{dbname or ''}"
     return hashlib.sha256(raw.encode()).hexdigest()[:12]

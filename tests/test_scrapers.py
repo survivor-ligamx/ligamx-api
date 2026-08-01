@@ -3,7 +3,6 @@
 Cubre factory, DemoScraper (datos hardcoded) y ESPNRequestsScraper (mockeando
 _get_json, el unico metodo que hace HTTP). Sube la cobertura de los scrapers.
 """
-
 from unittest import mock
 
 import pytest
@@ -62,56 +61,33 @@ def test_demo_standings():
 
 # --- ESPNRequestsScraper (mock de _get_json, sin red) ---
 TEAMS_JSON = {
-    "sports": [
-        {
-            "leagues": [
-                {
-                    "teams": [
-                        {
-                            "team": {
-                                "id": "1",
-                                "displayName": "Club América",
-                                "abbreviation": "AME",
-                                "location": "CDMX",
-                                "color": "Azul",
-                                "logos": [{"href": "http://x/a.png"}],
-                                "venue": {"name": "Estadio Azteca"},
-                            }
-                        },
-                        {"team": {"id": "2", "displayName": "Chivas", "abbreviation": "GDL", "location": "Guadalajara", "color": "Rojo", "logos": [], "venue": {}}},
-                    ]
-                }
-            ]
-        }
-    ]
+    "sports": [{"leagues": [{"teams": [
+        {"team": {"id": "1", "displayName": "Club América", "abbreviation": "AME",
+                  "location": "CDMX", "color": "Azul",
+                  "logos": [{"href": "http://x/a.png"}],
+                  "venue": {"name": "Estadio Azteca"}}},
+        {"team": {"id": "2", "displayName": "Chivas", "abbreviation": "GDL",
+                  "location": "Guadalajara", "color": "Rojo",
+                  "logos": [], "venue": {}}},
+    ]}]}]
 }
 
 STANDINGS_JSON = {
-    "children": [
-        {
-            "standings": {
-                "entries": [
-                    {
-                        "team": {"displayName": "Club América"},
-                        "stats": [
-                            {"name": "rank", "value": 1},
-                            {"name": "gamesPlayed", "value": 2},
-                            {"name": "wins", "value": 2},
-                            {"name": "ties", "value": 0},
-                            {"name": "losses", "value": 0},
-                            {"name": "pointsFor", "value": 5},
-                            {"name": "pointsAgainst", "value": 2},
-                            {"name": "pointDifferential", "value": 3},
-                            {"name": "points", "value": 6},
-                        ],
-                    },
-                ]
-            }
-        }
-    ]
+    "children": [{"standings": {"entries": [
+        {"team": {"displayName": "Club América"},
+         "stats": [{"name": "rank", "value": 1}, {"name": "gamesPlayed", "value": 2},
+                   {"name": "wins", "value": 2}, {"name": "ties", "value": 0},
+                   {"name": "losses", "value": 0}, {"name": "pointsFor", "value": 5},
+                   {"name": "pointsAgainst", "value": 2},
+                   {"name": "pointDifferential", "value": 3}, {"name": "points", "value": 6}]},
+    ]}}]
 }
 
-ROSTER_JSON = {"athletes": [{"id": "100", "displayName": "Henry Martín", "position": {"abbreviation": "FW"}, "jersey": "21", "citizenship": "México"}]}
+ROSTER_JSON = {
+    "athletes": [{"id": "100", "displayName": "Henry Martín",
+                  "position": {"abbreviation": "FW"}, "jersey": "21",
+                  "citizenship": "México"}]
+}
 
 
 def _fake_get_json(url, params=None, retries=3):
@@ -167,7 +143,8 @@ def test_espn_get_players():
 def test_espn_get_json_reintenta_y_falla():
     """_get_json reintenta y relanza si todas las llamadas fallan."""
     s = ESPNRequestsScraper()
-    with mock.patch("app.scrapers.espn_requests_scraper.requests.get", side_effect=Exception("red caída")):
+    with mock.patch("app.scrapers.espn_requests_scraper.requests.get",
+                    side_effect=Exception("red caída")):
         with mock.patch("app.scrapers.espn_requests_scraper.time.sleep"):
             with pytest.raises(Exception):
                 s._get_json("http://x", retries=2)

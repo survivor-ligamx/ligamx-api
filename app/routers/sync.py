@@ -13,7 +13,6 @@ from app import models
 
 router = APIRouter()
 
-
 @router.post("/sync")
 @limiter.limit(SYNC_LIMIT)
 def sync_data(request: Request, source: str = "espn", db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
@@ -55,7 +54,6 @@ def sync_player_identity(
     players.external_365_id) emparejando por nombre+equipo. Respeta los enlaces
     manuales existentes salvo que force=True. Idempotente."""
     from app.services.player_identity import build_player_identity_map
-
     result = build_player_identity_map(db, season, force=force)
     return {"message": "Mapa de identidad reconstruido", "result": result}
 
@@ -94,7 +92,12 @@ def sync_status(db: Session = Depends(get_db)):
     (cuan poblada esta la BD; en pretemporada 0 es correcto, no un error) y la
     fecha del partido mas reciente. Util para monitoreo y para confiar en la API."""
     last = db.query(models.SyncLog).order_by(models.SyncLog.finished_at.desc()).first()
-    last_success = db.query(models.SyncLog).filter(models.SyncLog.status == "success").order_by(models.SyncLog.finished_at.desc()).first()
+    last_success = (
+        db.query(models.SyncLog)
+        .filter(models.SyncLog.status == "success")
+        .order_by(models.SyncLog.finished_at.desc())
+        .first()
+    )
 
     def serialize(log):
         if not log:

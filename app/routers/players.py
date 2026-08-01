@@ -19,7 +19,6 @@ def _age_from_birthdate(birth_date):
     if not birth_date:
         return None
     from datetime import date, datetime as _dt
-
     try:
         d = _dt.fromisoformat(str(birth_date).replace("Z", "+00:00")).date()
     except (ValueError, TypeError):
@@ -79,16 +78,10 @@ def season_leaders(
     for i, (name, team, apps, value) in enumerate(rows):
         if value is None:
             continue
-        out.append(
-            {
-                "rank": i + 1,
-                "player": name,
-                "team": team,
-                "appearances": apps,
-                "stat": stat,
-                "value": round(float(value), 2) if stat in ("xg", "xa", "rating") else int(value),
-            }
-        )
+        out.append({
+            "rank": i + 1, "player": name, "team": team, "appearances": apps,
+            "stat": stat, "value": round(float(value), 2) if stat in ("xg", "xa", "rating") else int(value),
+        })
     return out
 
 
@@ -105,7 +98,8 @@ def xg_performance(
     label = resolve_season_label(db, season)
     M = models.PlayerMatchStat
     rows = (
-        db.query(M.player_name, M.team_name, func.count(M.id).label("apps"), func.sum(M.goals).label("goals"), func.sum(M.xg).label("xg"))
+        db.query(M.player_name, M.team_name, func.count(M.id).label("apps"),
+                 func.sum(M.goals).label("goals"), func.sum(M.xg).label("xg"))
         .filter(M.season == label)
         .group_by(M.player_name, M.team_name)
         .having(func.count(M.id) >= min_appearances)
@@ -115,16 +109,10 @@ def xg_performance(
     for name, team, apps, goals, xg in rows:
         g = int(goals or 0)
         x = round(float(xg or 0), 2)
-        out.append(
-            {
-                "player": name,
-                "team": team,
-                "appearances": apps,
-                "goals": g,
-                "xg": x,
-                "diff": round(g - x, 2),
-            }
-        )
+        out.append({
+            "player": name, "team": team, "appearances": apps,
+            "goals": g, "xg": x, "diff": round(g - x, 2),
+        })
     out.sort(key=lambda r: r["diff"], reverse=(order != "under"))
     for i, r in enumerate(out):
         r["rank"] = i + 1
@@ -149,9 +137,7 @@ def players_discipline(
     E, M = models.MatchEvent, models.Match
     rows = (
         db.query(
-            E.player_name,
-            E.team_id,
-            E.team_name,
+            E.player_name, E.team_id, E.team_name,
             func.sum(case((E.event_type == "yellow_card", 1), else_=0)).label("yellow"),
             func.sum(case((E.event_type == "red_card", 1), else_=0)).label("red"),
         )
@@ -181,7 +167,9 @@ _CARD_METRICS = {"yellow_cards", "red_cards"}
 
 @router.get("/players/leaderboard")
 def players_leaderboard(
-    metric: str = Query("goals", description=("Rendimiento: goals|assists|minutes|shots|xg|xa|key_passes|interceptions|touches|rating. Disciplina: yellow_cards|red_cards")),
+    metric: str = Query("goals", description=(
+        "Rendimiento: goals|assists|minutes|shots|xg|xa|key_passes|interceptions|touches|rating. "
+        "Disciplina: yellow_cards|red_cards")),
     season: str = Query(None),
     limit: int = Query(20, ge=1, le=100),
     order: str = Query("desc", description="desc|asc"),
@@ -241,10 +229,14 @@ def players_identity_map(db: Session = Depends(get_db)):
     total = db.query(models.Player).count()
     mapped = db.query(models.Player).filter(models.Player.external_365_id.isnot(None)).count()
     # ids de 365 que aparecen en stats pero no estan mapeados a ningun jugador
-    mapped_ids = {pid for (pid,) in db.query(models.Player.external_365_id).filter(models.Player.external_365_id.isnot(None)).all()}
-    src_ids = {pid for (pid,) in db.query(models.PlayerMatchStat.player_id).distinct().all() if pid is not None}
+    mapped_ids = {pid for (pid,) in db.query(models.Player.external_365_id)
+                  .filter(models.Player.external_365_id.isnot(None)).all()}
+    src_ids = {pid for (pid,) in db.query(models.PlayerMatchStat.player_id).distinct().all()
+               if pid is not None}
     unmapped_sources = sorted(src_ids - mapped_ids)
-    sample = db.query(models.Player).filter(models.Player.external_365_id.isnot(None)).limit(20).all()
+    sample = (db.query(models.Player)
+              .filter(models.Player.external_365_id.isnot(None))
+              .limit(20).all())
     return {
         "players_total": total,
         "players_mapped": mapped,
@@ -252,7 +244,10 @@ def players_identity_map(db: Session = Depends(get_db)):
         "coverage_pct": round(mapped / total * 100, 1) if total else 0.0,
         "stats_source_ids": len(src_ids),
         "stats_source_ids_unmapped": len(unmapped_sources),
-        "sample": [{"player_id": p.id, "name": p.name, "team_id": p.team_id, "external_365_id": p.external_365_id} for p in sample],
+        "sample": [
+            {"player_id": p.id, "name": p.name, "team_id": p.team_id,
+             "external_365_id": p.external_365_id} for p in sample
+        ],
     }
 
 
@@ -290,11 +285,9 @@ def search_players(
 def get_players(limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
     return db.query(models.Player).offset(offset).limit(limit).all()
 
-
 @router.get("/players/{player_id}", response_model=schemas.PlayerResponse)
 def get_player(player_id: int, db: Session = Depends(get_db)):
     return get_or_404(db, models.Player, player_id)
-
 
 @router.get("/players/{player_id}/stats", response_model=schemas.PlayerStatResponse)
 def get_player_stat(player_id: int, db: Session = Depends(get_db), season: str = Query(None)):
@@ -370,6 +363,7 @@ def get_player_season_stats(player_id: int, season: str = Query(None), db: Sessi
     }
 
 
+
 @router.get("/players/{player_id}/discipline")
 def get_player_discipline(player_id: int, season: str = Query(None), db: Session = Depends(get_db)):
     """Tarjetas acumuladas de un jugador en la temporada y su estado de suspension
@@ -397,12 +391,14 @@ def get_player_discipline(player_id: int, season: str = Query(None), db: Session
             elif etype == "red_card":
                 red += 1
     d = discipline_summary(yellow, red)
-    d.update({"player_id": player_id, "player": player.name, "team_id": player.team_id, "season": label})
+    d.update({"player_id": player_id, "player": player.name,
+              "team_id": player.team_id, "season": label})
     return d
 
 
 @router.get("/players/{player_id}/form")
-def get_player_form(player_id: int, last: int = Query(5, ge=1, le=20), season: str = Query(None), db: Session = Depends(get_db)):
+def get_player_form(player_id: int, last: int = Query(5, ge=1, le=20),
+                    season: str = Query(None), db: Session = Depends(get_db)):
     """Forma reciente del jugador: ultimos N partidos con rating/goles/asistencias,
     rating promedio reciente, totales y racha de goleo (partidos seguidos marcando)."""
     player = get_or_404(db, models.Player, player_id)
@@ -425,7 +421,10 @@ def get_player_form(player_id: int, last: int = Query(5, ge=1, le=20), season: s
         "assists": sum(r.assists or 0 for r in recent),
         "avg_rating": round(sum(ratings) / len(ratings), 2) if ratings else None,
         "scoring_streak": scoring_streak,
-        "matches": [{"match_id": r.match_id, "minutes": r.minutes, "goals": r.goals, "assists": r.assists, "rating": r.rating} for r in recent],
+        "matches": [
+            {"match_id": r.match_id, "minutes": r.minutes, "goals": r.goals,
+             "assists": r.assists, "rating": r.rating} for r in recent
+        ],
     }
 
 
@@ -445,29 +444,22 @@ def get_player_profile(player_id: int, season: str = Query(None), db: Session = 
     recent = sorted(rows, key=lambda r: (r.match_id is None, r.match_id), reverse=True)[:5]
     return {
         "player": {
-            "id": player.id,
-            "name": player.name,
-            "position": player.position,
-            "number": player.number,
-            "nationality": player.nationality,
-            "flag_url": player.flag_url,
-            "photo_url": player.photo_url,
-            "birth_date": player.birth_date,
-            "age": _age_from_birthdate(player.birth_date),
-            "height": player.height,
-            "weight": player.weight,
+            "id": player.id, "name": player.name, "position": player.position,
+            "number": player.number, "nationality": player.nationality,
+            "flag_url": player.flag_url, "photo_url": player.photo_url,
+            "birth_date": player.birth_date, "age": _age_from_birthdate(player.birth_date),
+            "height": player.height, "weight": player.weight,
             "team": {"id": team.id, "name": team.name, "logo_url": team.logo_url} if team else None,
         },
         "season": label,
         "season_stats": {
-            "appearances": len(rows),
-            "minutes": _sum("minutes"),
-            "goals": _sum("goals"),
-            "assists": _sum("assists"),
-            "shots": _sum("shots"),
-            "xg": round(_sum("xg"), 2),
-            "xa": round(_sum("xa"), 2),
+            "appearances": len(rows), "minutes": _sum("minutes"), "goals": _sum("goals"),
+            "assists": _sum("assists"), "shots": _sum("shots"),
+            "xg": round(_sum("xg"), 2), "xa": round(_sum("xa"), 2),
             "avg_rating": round(sum(ratings) / len(ratings), 2) if ratings else None,
         },
-        "recent_matches": [{"match_id": r.match_id, "minutes": r.minutes, "goals": r.goals, "assists": r.assists, "rating": r.rating} for r in recent],
+        "recent_matches": [
+            {"match_id": r.match_id, "minutes": r.minutes, "goals": r.goals,
+             "assists": r.assists, "rating": r.rating} for r in recent
+        ],
     }

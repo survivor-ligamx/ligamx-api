@@ -28,28 +28,27 @@ def guardar_odds(
     """
     filas = []
     for item in payload:
-        filas.append(
-            models.MatchOdds(
-                season=item.season,
-                home_team=item.home_team,
-                away_team=item.away_team,
-                match_date=item.match_date,
-                source=item.source,
-                odds_local=item.odds_local,
-                odds_empate=item.odds_empate,
-                odds_visita=item.odds_visita,
-                ou_linea=item.ou_linea,
-                odds_over=item.odds_over,
-                odds_under=item.odds_under,
-                extra=item.extra,
-            )
-        )
+        filas.append(models.MatchOdds(
+            season=item.season,
+            home_team=item.home_team,
+            away_team=item.away_team,
+            match_date=item.match_date,
+            source=item.source,
+            odds_local=item.odds_local,
+            odds_empate=item.odds_empate,
+            odds_visita=item.odds_visita,
+            ou_linea=item.ou_linea,
+            odds_over=item.odds_over,
+            odds_under=item.odds_under,
+            extra=item.extra,
+        ))
     db.add_all(filas)
     db.commit()
     return {"message": "Momios archivados", "guardados": len(filas)}
 
 
-@router.get("/odds", response_model=list[schemas.MatchOddsResponse], summary="Consultar histórico de momios")
+@router.get("/odds", response_model=list[schemas.MatchOddsResponse],
+            summary="Consultar histórico de momios")
 def listar_odds(
     db: Session = Depends(get_db),
     season: Optional[str] = Query(None, description="Filtra por temporada (ej. 'Apertura 2026')"),
@@ -69,4 +68,5 @@ def listar_odds(
         q = q.filter(models.MatchOdds.away_team == away_team)
     if desde:
         q = q.filter(models.MatchOdds.captured_at >= desde)
-    return q.order_by(models.MatchOdds.captured_at.desc()).offset(offset).limit(limit).all()
+    return (q.order_by(models.MatchOdds.captured_at.desc())
+            .offset(offset).limit(limit).all())

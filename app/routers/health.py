@@ -11,11 +11,9 @@ from app.cache import cache_stats
 
 router = APIRouter()
 
-
 @router.get("/")
 def read_root():
     return {"message": "API Liga MX", "version": "1.0", "status": "running"}
-
 
 @router.get("/health")
 def health_check():
@@ -39,7 +37,8 @@ def readiness(db: Session = Depends(get_db)):
             checks["redis"] = "ok"
         except Exception as e:
             checks["redis"] = f"error: {str(e)[:80]}"
-    return JSONResponse(status_code=200 if healthy else 503, content={"ready": healthy, "checks": checks})
+    return JSONResponse(status_code=200 if healthy else 503,
+                        content={"ready": healthy, "checks": checks})
 
 
 @router.get("/metrics", tags=["meta"])
@@ -50,7 +49,6 @@ def metrics_endpoint():
     snap["cache"] = cache_stats()
     return snap
 
-
 @router.get("/season")
 def season_info(db: Session = Depends(get_db)):
     """Informacion del torneo vigente y de los datos cargados, para saber con
@@ -59,7 +57,12 @@ def season_info(db: Session = Depends(get_db)):
     season = db.query(models.Season).order_by(models.Season.id.desc()).first()
     total_matches = db.query(models.Match).count()
     finished = db.query(models.Match).filter(models.Match.status == "finished").count()
-    first = db.query(models.Match).filter(models.Match.match_date.isnot(None)).order_by(models.Match.match_date).first()
+    first = (
+        db.query(models.Match)
+        .filter(models.Match.match_date.isnot(None))
+        .order_by(models.Match.match_date)
+        .first()
+    )
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     first_date = to_naive_utc(first.match_date if first else None)
     started = bool(first_date and first_date <= now)
