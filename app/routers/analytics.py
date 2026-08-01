@@ -301,8 +301,18 @@ def predict_match(
     raw_h = max(0.05, home_rates["raw_gf_rate"] * (away_rates["raw_ga_rate"] / base_avg))
     raw_a = max(0.05, away_rates["raw_gf_rate"] * (home_rates["raw_ga_rate"] / base_avg))
 
-    exp_h = max(0.05, home_rates["reg_gf_rate"] * (away_rates["reg_ga_rate"] / base_avg))
-    exp_a = max(0.05, away_rates["reg_gf_rate"] * (home_rates["reg_ga_rate"] / base_avg))
+    exp_h = max(
+        0.05,
+        league["home_avg"]
+        * (home_rates["reg_gf_rate"] / base_avg)
+        * (away_rates["reg_ga_rate"] / base_avg),
+    )
+    exp_a = max(
+        0.05,
+        league["away_avg"]
+        * (away_rates["reg_gf_rate"] / base_avg)
+        * (home_rates["reg_ga_rate"] / base_avg),
+    )
 
     confidence = min(1.0, ((home_rates["sample"] + away_rates["sample"]) / 2.0) / (((home_rates["sample"] + away_rates["sample"]) / 2.0) + prior_strength))
     max_lam = 3.1 + confidence * 0.9
