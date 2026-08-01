@@ -11,7 +11,7 @@ def test_health(client):
 def test_teams_incluye_logo_y_estadio(client, seeded):
     r = client.get("/teams")
     assert r.status_code == 200
-    ame = [t for t in r.json() if t["id"] == 1][0]
+    ame = next(t for t in r.json() if t["id"] == 1)
     assert ame["logo_url"] == "http://x/a.png"
     assert ame["founded"] == 1916
     assert ame["stadium"]["capacity"] == 50000
@@ -168,7 +168,7 @@ def test_365_match_player_stats(client, monkeypatch):
 
 
 def test_stat_parsers():
-    from app.services.sync_service import _stat_int, _stat_float, _stat_fraction
+    from app.services.sync_service import _stat_float, _stat_fraction, _stat_int
 
     assert _stat_int("58'") == 58
     assert _stat_int("0") == 0
@@ -247,11 +247,11 @@ def test_players_season_leaders(client, seeded, db):
 def _season_payload(event_id="E1", match_date=None):
     from datetime import datetime
 
-    return dict(
-        stadiums=[{"name": "Azteca", "city": "CDMX"}],
-        teams=[{"id": 1, "name": "América"}, {"id": 2, "name": "Chivas"}],
-        players=[{"id": 10, "name": "Henry Martín", "team_name": "América"}],
-        matches=[
+    return {
+        "stadiums": [{"name": "Azteca", "city": "CDMX"}],
+        "teams": [{"id": 1, "name": "América"}, {"id": 2, "name": "Chivas"}],
+        "players": [{"id": 10, "name": "Henry Martín", "team_name": "América"}],
+        "matches": [
             {
                 "home_team": "América",
                 "away_team": "Chivas",
@@ -264,8 +264,8 @@ def _season_payload(event_id="E1", match_date=None):
                 "event_id": event_id,
             }
         ],
-        standings=[{"team_name": "América", "position": 1, "played": 1, "won": 1, "drawn": 0, "lost": 0, "goals_for": 1, "goals_against": 0, "points": 3}],
-    )
+        "standings": [{"team_name": "América", "position": 1, "played": 1, "won": 1, "drawn": 0, "lost": 0, "goals_for": 1, "goals_against": 0, "points": 3}],
+    }
 
 
 def test_write_season_data_no_destructivo(db):
@@ -463,6 +463,7 @@ def test_compute_standings_from_matches():
 
 def test_run_backfill_crea_temporada_pasada(db, monkeypatch):
     from datetime import datetime
+
     from app import models
     from app.services import sync_service
 
@@ -598,9 +599,9 @@ def test_rate_limit_devuelve_429():
     from fastapi import FastAPI, Request
     from fastapi.testclient import TestClient
     from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.util import get_remote_address
     from slowapi.errors import RateLimitExceeded
     from slowapi.middleware import SlowAPIMiddleware
+    from slowapi.util import get_remote_address
 
     lim = Limiter(key_func=get_remote_address, default_limits=["2/minute"])
     app = FastAPI()
@@ -895,6 +896,7 @@ def test_xg_performance(client, seeded, db):
 
 def test_news_incluye_imagen(client, db):
     from datetime import datetime
+
     from app import models
 
     db.add(models.News(title="Gol de último minuto", link="http://x/n1", description="...", source="365Scores", image_url="http://img/portada.webp", published_at=datetime(2026, 7, 1)))
@@ -1221,6 +1223,7 @@ def test_team_streak(client, seeded):
 
 def test_standings_projection(client, seeded, db):
     from datetime import datetime
+
     from app import models
 
     # sin partidos restantes: la proyección iguala los puntos actuales
@@ -1456,6 +1459,7 @@ def test_liguilla_results_sin_fase_final(client, seeded):
 
 def test_liguilla_results_serie_real(client, seeded, db):
     from datetime import datetime
+
     from app import models
 
     # Cuartos de final, ida y vuelta entre equipo 1 y 2
@@ -1528,7 +1532,7 @@ def test_stadium_maps_url_por_nombre(client, db):
 
 def test_stadium_maps_url_en_teams(client, seeded):
     # el fixture liga el equipo 1 al estadio 1 -> el maps_url aparece en /teams
-    ame = [t for t in client.get("/teams").json() if t["id"] == 1][0]
+    ame = next(t for t in client.get("/teams").json() if t["id"] == 1)
     assert ame["stadium"]["maps_url"].startswith("https://www.google.com/maps/search/")
 
 
@@ -1537,6 +1541,7 @@ def test_stadium_maps_url_en_teams(client, seeded):
 
 def test_seasons_compare(client, seeded, db):
     from datetime import datetime
+
     from app import models
 
     # segunda temporada con datos propios
@@ -1716,6 +1721,7 @@ def test_365_lineup_impact_sin_xi(client, seeded, monkeypatch):
 def test_sync_status_freshness_fresco(client, db):
     """Con una sync exitosa reciente, freshness.is_stale debe ser False."""
     from datetime import datetime
+
     from app import models
 
     db.add(
@@ -1790,6 +1796,7 @@ def test_bot_endpoints_pretemporada_sin_datos(client, monkeypatch):
 def _seed_two_seasons_h2h(db):
     """2 temporadas con enfrentamientos América(227)–Pachuca(234) en cada una."""
     from datetime import datetime
+
     from app import models
 
     db.add(models.Season(id=1, name="Apertura 2024", year=2024, tournament_type="Apertura"))
@@ -1825,6 +1832,7 @@ def test_h2h_agrega_por_nombre_canonico_ids_duplicados(client, db):
     """Si un club aparece con team_id distinto en otra temporada (misma marca),
     el H2H debe agregarlos por nombre canonico y no perder partidos."""
     from datetime import datetime
+
     from app import models
 
     db.add(models.Season(id=1, name="Apertura 2024", year=2024, tournament_type="Apertura"))
@@ -1845,6 +1853,7 @@ def test_matches_sin_season_incluye_todas_las_temporadas(client, db):
     """GET /matches sin `season` debe devolver partidos de todas las temporadas,
     no solo la vigente."""
     from datetime import datetime
+
     from app import models
 
     db.add(models.Season(id=1, name="Apertura 2024", year=2024, tournament_type="Apertura"))
