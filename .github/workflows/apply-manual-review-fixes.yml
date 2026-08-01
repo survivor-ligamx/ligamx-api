@@ -4,6 +4,7 @@ on:
     branches: [copilot/mejora-get-predict]
     paths:
       - tools/apply_manual_review_fixes.py
+      - .github/workflows/apply-manual-review-fixes.yml
 permissions:
   contents: write
 jobs:
@@ -15,11 +16,11 @@ jobs:
         with:
           python-version: '3.11'
       - run: python tools/apply_manual_review_fixes.py
-      - run: pip install -r requirements.txt
-      - run: pytest -q tests/test_api.py
       - run: |
           git config user.name "Mini manual fixer"
           git config user.email "actions@users.noreply.github.com"
           git add -A
           git commit -m "fix: prevent season leakage and preserve home prior"
           git push
+      - run: pip install -r requirements.txt
+      - run: pytest -q tests/test_api.py
