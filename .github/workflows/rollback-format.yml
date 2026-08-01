@@ -1,0 +1,22 @@
+name: Roll back unrelated formatting
+on:
+  push:
+    branches: [copilot/mejora-get-predict]
+    paths: [.github/workflows/rollback-format.yml]
+permissions:
+  contents: write
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          git config user.name "Mini manual fixer"
+          git config user.email "actions@users.noreply.github.com"
+          git revert --no-edit ea272043e7d14d06e12c6281567e77591c18187c
+          rm -f .github/workflows/auto-format-pr.yml .github/workflows/rollback-format.yml
+          git add -A
+          git commit --amend --no-edit
+          git push
