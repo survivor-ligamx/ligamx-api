@@ -221,7 +221,7 @@ Comando rápido para confirmar frescura y que todo responde:
 ### Analítica 🆕
 - `GET /compare/players?a=&b=&season=` — **compara dos jugadores** lado a lado (goles, asistencias, xG, xA, rating...)
 - `GET /compare/teams?a=&b=&season=` — **compara dos equipos** (posición, puntos, registro, goles, xG)
-- `GET /predict?home=&away=&season=` — **predice un partido** (modelo Poisson): goles esperados, probabilidades 1/X/2 y marcador más probable
+- `GET /predict?home=&away=&season=&prior_strength=` — **predice un partido** con Poisson regularizado + ajuste Dixon-Coles: conserva `probabilities` y agrega `probabilities_raw`, `probabilities_regularized`, `draw_probability`, `expected_goals`, `top_scorelines`, `sample_size`, `prior_strength`, `confidence/uncertainty` y factores explicables
 - `GET /power-ranking?season=` — **ranking de poder** de equipos (puntos/partido + diferencia de goles, escala 0-100; xG informativo) 🆕
 
 ### Perfiles 🆕
