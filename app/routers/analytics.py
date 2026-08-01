@@ -129,16 +129,22 @@ def _normalize_matrix(matrix):
     return [[v / total for v in row] for row in matrix]
 
 
-def _reduce_outcome_extremes(probabilities, confidence: float):
+def _temper_outcome_extremes(probabilities, confidence: float):
     cap = 0.75 + (0.2 * confidence)
     clamped = {k: min(v, cap) for k, v in probabilities.items()}
     total = sum(clamped.values()) or 1.0
     return {k: v / total for k, v in clamped.items()}
 
 
-def _match_sample_stats(db: Session):
+def _match_sample_stats(db: Session, season_id: int | None):
+    query = db.query(models.Match)
+    # Nunca mezclar temporadas: evita que una predicción histórica vea partidos
+    # posteriores. El endpoint no conoce una fecha de fixture, por lo que usa
+    # únicamente los partidos ya terminados del torneo solicitado.
+    if season_id is not None:
+        query = query.filter(models.Match.season_id == season_id)
     rows = (
-        db.query(models.Match)
+        query
         .filter(
             and_(
                 models.Match.status == 'finished',
@@ -233,7 +239,9 @@ def _rates(team_bundle, league, is_home: bool, prior_strength: float):
     gf_rate = _safe_div(context.get('gf', 0.0), sample)
     ga_rate = _safe_div(context.get('ga', 0.0), sample)
     side_mean = league['home_avg'] if is_home else league['away_avg']
-    prior_mean = side_mean if context_name != 'overall' else league['overall_avg']
+    # Aun con contexto overall, el prior conserva la sede; de otro modo la
+    # ventaja local desaparecía precisamente cuando la muestra era pequeña.
+    prior_mean = side_mean
     reg_gf = _regularize_rate(gf_rate, sample, prior_mean, prior_strength)
     reg_ga = _regularize_rate(ga_rate, sample, prior_mean, prior_strength)
     return {
@@ -258,7 +266,7 @@ def predict_match(home: int = Query(..., description="team_id local"),
     ta = get_or_404(db, models.Team, away)
     season_id = resolve_season_id(db, season)
     standings = db.query(models.Standing).filter(models.Standing.season_id == season_id).all() if season_id is not None else []
-    team_stats, league = _match_sample_stats(db)
+    team_stats, league = _match_sample_stats(db, season_id)
     if league['matches'] <= 0:
         team_stats, league = _standing_fallback_stats([s for s in standings if (s.played or 0) > 0])
 
@@ -318,7 +326,7 @@ def predict_match(home: int = Query(..., description="team_id local"),
                 away_win += p
             scored.append((i, j, p))
 
-    calibrated = _reduce_outcome_extremes({'home_win': home_win, 'draw': draw, 'away_win': away_win}, confidence)
+    tempered = _temper_outcome_extremes({'home_win': home_win, 'draw': draw, 'away_win': away_win}, confidence)
     raw_total = home_raw + draw_raw + away_raw or 1.0
     raw_probs = {'home_win': home_raw / raw_total, 'draw': draw_raw / raw_total, 'away_win': away_raw / raw_total}
     top_scorelines = sorted(scored, key=lambda x: x[2], reverse=True)[:3]
@@ -328,11 +336,11 @@ def predict_match(home: int = Query(..., description="team_id local"),
         "home_team": {"id": home, "name": th.name},
         "away_team": {"id": away, "name": ta.name},
         "expected_goals": {"home": round(exp_h, 2), "away": round(exp_a, 2)},
-        "draw_probability": round(calibrated["draw"], 3),
+        "draw_probability": round(tempered["draw"], 3),
         "probabilities": {
-            "home_win": round(calibrated["home_win"], 3),
-            "draw": round(calibrated["draw"], 3),
-            "away_win": round(calibrated["away_win"], 3),
+            "home_win": round(tempered["home_win"], 3),
+            "draw": round(tempered["draw"], 3),
+            "away_win": round(tempered["away_win"], 3),
         },
         "probabilities_raw": {
             "home_win": round(raw_probs["home_win"], 3),
@@ -340,9 +348,9 @@ def predict_match(home: int = Query(..., description="team_id local"),
             "away_win": round(raw_probs["away_win"], 3),
         },
         "probabilities_regularized": {
-            "home_win": round(calibrated["home_win"], 3),
-            "draw": round(calibrated["draw"], 3),
-            "away_win": round(calibrated["away_win"], 3),
+            "home_win": round(tempered["home_win"], 3),
+            "draw": round(tempered["draw"], 3),
+            "away_win": round(tempered["away_win"], 3),
         },
         "most_likely_score": {"home": best_score[0], "away": best_score[1], "probability": round(best_score[2], 3)},
         "top_scorelines": [{"home": i, "away": j, "probability": round(p, 3)} for i, j, p in top_scorelines],
@@ -352,6 +360,7 @@ def predict_match(home: int = Query(..., description="team_id local"),
             "league_matches": league["matches"],
         },
         "prior_strength": round(prior_strength, 2),
+        "tempering": {"applied": True, "method": "confidence_aware_cap", "empirically_calibrated": False},
         "confidence": round(confidence, 3),
         "uncertainty": round(1.0 - confidence, 3),
         "factors": [
@@ -359,6 +368,7 @@ def predict_match(home: int = Query(..., description="team_id local"),
             "Separacion local/visitante cuando la muestra por sede es suficiente",
             "Correccion Dixon-Coles aplicada a marcadores bajos (0-0, 1-0, 0-1, 1-1)",
             "Fallback a medias de liga cuando hay pocos o nulos datos historicos",
+            "Tempering heuristico de extremos; no es calibracion empirica",
         ],
         "model": "Poisson regularizado + Dixon-Coles (sin usar partidos futuros)",
     }

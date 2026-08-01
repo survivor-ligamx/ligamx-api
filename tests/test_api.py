@@ -1013,6 +1013,9 @@ def test_predict_equipos_nuevos_sin_historial(client, seeded, db):
     assert abs(p["home_win"] + p["draw"] + p["away_win"] - 1.0) < 0.01
     assert r["expected_goals"]["home"] > 0
     assert r["expected_goals"]["away"] > 0
+    # Con equipos neutrales y sin muestra, el prior debe conservar la localía.
+    assert p["home_win"] > p["away_win"]
+    assert r["tempering"]["empirically_calibrated"] is False
 
 
 def test_predict_sin_datos(client, db):
