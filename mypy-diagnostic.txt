@@ -1,6 +1,0 @@
-app/services/sync_service.py:71: error: Argument 1 to "int" has incompatible
-type "Any | None"; expected
-"str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc"  [arg-type]
-                week = int(raw_week)
-                           ^~~~~~~~
-Found 1 error in 1 file (checked 41 source files)
