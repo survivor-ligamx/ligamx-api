@@ -67,10 +67,13 @@ def calculate_week_numbers(matches: List[Dict[str, Any]]):
     missing = []
     for match in matches:
         raw_week = match.get("week")
-        try:
-            week = int(raw_week)
-        except (TypeError, ValueError):
+        if raw_week is None:
             week = 0
+        else:
+            try:
+                week = int(raw_week)
+            except (TypeError, ValueError):
+                week = 0
         if week > 0:
             match["week"] = week
             if match.get("match_date"):
