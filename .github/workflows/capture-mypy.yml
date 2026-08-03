@@ -25,23 +25,23 @@ jobs:
 
           path = Path("app/services/sync_service.py")
           text = path.read_text()
-          old = '''        raw_week = match.get("week")
-          try:
-              week = int(raw_week)
-          except (TypeError, ValueError):
-              week = 0
-          '''
-          old = "\n".join(line[8:] if line.startswith("        ") else line for line in old.splitlines()) + "\n"
-          new = '''        raw_week = match.get("week")
-          if raw_week is None:
-              week = 0
-          else:
-              try:
-                  week = int(raw_week)
-              except (TypeError, ValueError):
-                  week = 0
-          '''
-          new = "\n".join(line[8:] if line.startswith("        ") else line for line in new.splitlines()) + "\n"
+          old = "\n".join([
+              '        raw_week = match.get("week")',
+              "        try:",
+              "            week = int(raw_week)",
+              "        except (TypeError, ValueError):",
+              "            week = 0",
+          ]) + "\n"
+          new = "\n".join([
+              '        raw_week = match.get("week")',
+              "        if raw_week is None:",
+              "            week = 0",
+              "        else:",
+              "            try:",
+              "                week = int(raw_week)",
+              "            except (TypeError, ValueError):",
+              "                week = 0",
+          ]) + "\n"
           if old not in text:
               raise SystemExit("Expected optional week block not found")
           path.write_text(text.replace(old, new, 1))
