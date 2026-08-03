@@ -146,11 +146,54 @@ def _normalize_matrix(matrix):
     return [[v / total for v in row] for row in matrix]
 
 
-def _temper_outcome_extremes(probabilities, confidence: float):
-    cap = 0.75 + (0.2 * confidence)
-    clamped = {k: min(v, cap) for k, v in probabilities.items()}
-    total = sum(clamped.values()) or 1.0
-    return {k: v / total for k, v in clamped.items()}
+def _outcome_cap(confidence: float) -> float:
+    """Techo que se le permite a un solo resultado, segun la confianza."""
+    return 0.75 + (0.2 * confidence)
+
+
+def _temper_outcome_extremes(probabilities: dict[str, float], confidence: float) -> dict[str, float]:
+    """Recorta los extremos SIN que el valor recortado vuelva a subir.
+
+    La version anterior recortaba al techo y despues renormalizaba dividiendo
+    entre la suma. Como esa suma quedaba por debajo de 1, la division volvia a
+    inflar el propio valor que se acababa de recortar: con cap 0.75, la entrada
+    0.82 / 0.12 / 0.06 sumaba 0.93 tras el recorte y terminaba devolviendo
+    0.806, por encima del techo que la funcion decia respetar.
+
+    Ahora el excedente se reparte entre las opciones que todavia tienen holgura,
+    proporcional a su peso, de modo que el total sigue sumando 1, ninguna clave
+    supera el cap y se conserva la proporcion relativa entre las no recortadas.
+    """
+    total = sum(probabilities.values())
+    if total <= 0:
+        size = len(probabilities) or 1
+        return {k: 1.0 / size for k in probabilities}
+
+    result = {k: float(v) / total for k, v in probabilities.items()}
+    cap = _outcome_cap(confidence)
+    if cap >= 1.0:
+        return result
+
+    # Un solo pase basta para 3 resultados; el bucle es red de seguridad.
+    for _ in range(len(result)):
+        excess = 0.0
+        for k, v in result.items():
+            if v > cap:
+                excess += v - cap
+                result[k] = cap
+        if excess <= 1e-12:
+            break
+        pool = sum(v for v in result.values() if v < cap)
+        if pool <= 1e-12:
+            # Todas pegadas al techo: reparto parejo y salimos.
+            share = excess / len(result)
+            for k in result:
+                result[k] += share
+            break
+        for k, v in list(result.items()):
+            if v < cap:
+                result[k] = v + excess * (v / pool)
+    return result
 
 
 def _match_sample_stats(db: Session, season_id: int | None):
@@ -398,7 +441,7 @@ def predict_match(
             "league_matches": league["matches"],
         },
         "prior_strength": round(prior_strength, 2),
-        "tempering": {"applied": True, "method": "confidence_aware_cap", "empirically_calibrated": False},
+        "tempering": {"applied": True, "method": "confidence_aware_cap", "cap": round(_outcome_cap(confidence), 3), "empirically_calibrated": False},
         "confidence": round(confidence, 3),
         "uncertainty": round(1.0 - confidence, 3),
         "factors": [
