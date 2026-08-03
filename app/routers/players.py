@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 import unicodedata
 from app.database import get_db
-from app.dependencies import get_or_404, resolve_season_label, resolve_season_id, discipline_summary
+from app.dependencies import get_or_404, resolve_season_label, resolve_season_id, discipline_summary, SUSPENSION_YELLOWS
 from app import models, schemas
-from typing import Optional
+from typing import Any, Optional
 
 router = APIRouter()
 
@@ -28,6 +28,52 @@ def _age_from_birthdate(birth_date):
             return None
     today = date.today()
     return today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+
+
+def _last_played_match_by_team(db, season_id) -> dict[Any, Any]:
+    """Mapa team_id -> id del ultimo partido YA JUGADO de la temporada.
+
+    Se considera jugado cuando home_score no es nulo (no se depende del
+    vocabulario de `status`, que varia entre fuentes). Sirve para saber si una
+    expulsion ocurrio en la jornada mas reciente y, por tanto, si el castigo
+    sigue vigente para el proximo partido.
+    """
+    last_by_team: dict[Any, Any] = {}
+    if season_id is None:
+        return last_by_team
+    M = models.Match
+    rows = (
+        db.query(M.id, M.home_team_id, M.away_team_id)
+        .filter(M.season_id == season_id, M.home_score.isnot(None))
+        .order_by(M.match_date.asc())
+        .all()
+    )
+    for match_id, home_id, away_id in rows:
+        for team_id in (home_id, away_id):
+            if team_id is not None:
+                last_by_team[team_id] = match_id
+    return last_by_team
+
+
+def _suspension_state(yellow, red_in_last_match, threshold=SUSPENSION_YELLOWS) -> tuple[bool, Optional[str]]:
+    """Determina si el jugador esta inhabilitado para el proximo partido.
+
+    Dos causas independientes:
+    - Roja en el ultimo partido disputado por su equipo.
+    - Ciclo de amarillas completado (5, 10, 15...): al llegar al multiplo el
+      castigo se cumple en la jornada siguiente.
+    """
+    y = int(yellow or 0)
+    ciclo_completo = y > 0 and y % threshold == 0
+    suspended = bool(red_in_last_match) or ciclo_completo
+    reason: Optional[str]
+    if red_in_last_match:
+        reason = "roja"
+    elif ciclo_completo:
+        reason = "acumulacion de amarillas"
+    else:
+        reason = None
+    return suspended, reason
 
 
 # Metricas agregables para la tabla de lideres de temporada (desde player_match_stats)
@@ -125,11 +171,18 @@ def players_discipline(
     order: str = Query("discipline_points", description="discipline_points|yellow_cards|red_cards"),
     limit: int = Query(20, ge=1, le=100),
     at_risk: bool = Query(False, description="solo jugadores a una amarilla de suspension"),
+    unavailable: bool = Query(False, description="solo jugadores suspendidos para el proximo partido"),
     db: Session = Depends(get_db),
 ):
     """Tabla de disciplina por jugador de la temporada: tarjetas amarillas y rojas
-    acumuladas (desde los eventos de cada partido). Marca quien esta en riesgo de
-    suspension por acumulacion de amarillas (regla Liga MX: 5 amarillas = 1 partido)."""
+    acumuladas (desde los eventos de cada partido).
+
+    Distingue dos estados que antes se confundian:
+    - `suspension_risk`: aviso preventivo, esta a UNA amarilla de suspenderse.
+    - `suspended_next_match`: NO puede jugar la proxima jornada, ya sea por roja
+      en el ultimo partido de su equipo o por haber completado el ciclo de
+      amarillas (regla Liga MX: 5 amarillas = 1 partido).
+    """
     label = resolve_season_label(db, season)
     season_id = resolve_season_id(db, season)
     if season_id is None:
@@ -140,6 +193,7 @@ def players_discipline(
             E.player_name, E.team_id, E.team_name,
             func.sum(case((E.event_type == "yellow_card", 1), else_=0)).label("yellow"),
             func.sum(case((E.event_type == "red_card", 1), else_=0)).label("red"),
+            func.max(case((E.event_type == "red_card", M.id), else_=None)).label("last_red_match_id"),
         )
         .join(M, E.match_id == M.id)
         .filter(M.season_id == season_id)
@@ -148,13 +202,23 @@ def players_discipline(
         .group_by(E.player_name, E.team_id, E.team_name)
         .all()
     )
+    last_by_team = _last_played_match_by_team(db, season_id)
     out = []
-    for name, team_id, team_name, yellow, red in rows:
-        d = discipline_summary(yellow, red)
+    for name, team_id, team_name, yellow, red, last_red_match_id in rows:
+        d: dict[str, Any] = dict(discipline_summary(yellow, red))
+        red_in_last_match = (
+            last_red_match_id is not None
+            and last_red_match_id == last_by_team.get(team_id)
+        )
+        suspended, reason = _suspension_state(yellow, red_in_last_match)
+        d["suspended_next_match"] = suspended
+        d["suspension_reason"] = reason
         d.update({"player": name, "team_id": team_id, "team": team_name})
         out.append(d)
     if at_risk:
         out = [r for r in out if r["suspension_risk"]]
+    if unavailable:
+        out = [r for r in out if r["suspended_next_match"]]
     key = order if order in ("yellow_cards", "red_cards", "discipline_points") else "discipline_points"
     out.sort(key=lambda r: r[key], reverse=True)
     for i, r in enumerate(out):
@@ -366,31 +430,45 @@ def get_player_season_stats(player_id: int, season: str = Query(None), db: Sessi
 
 @router.get("/players/{player_id}/discipline")
 def get_player_discipline(player_id: int, season: str = Query(None), db: Session = Depends(get_db)):
-    """Tarjetas acumuladas de un jugador en la temporada y su estado de suspension
-    (regla Liga MX: 5 amarillas = 1 partido)."""
+    """Tarjetas acumuladas de un jugador en la temporada y su estado de suspension.
+
+    Incluye `suspended_next_match` y `suspension_reason`: una roja inhabilita el
+    partido siguiente y completar el ciclo de amarillas (regla Liga MX: 5
+    amarillas = 1 partido) tambien."""
     player = get_or_404(db, models.Player, player_id)
     label = resolve_season_label(db, season)
     season_id = resolve_season_id(db, season)
     nq = _norm(player.name)
     yellow = red = 0
+    last_red_match_id: Any = None
     if season_id is not None:
         E, M = models.MatchEvent, models.Match
         events = (
-            db.query(E.event_type, E.player_name)
+            db.query(E.event_type, E.player_name, E.match_id)
             .join(M, E.match_id == M.id)
             .filter(M.season_id == season_id)
             .filter(E.event_type.in_(["yellow_card", "red_card"]))
             .filter(E.player_name.isnot(None))
             .all()
         )
-        for etype, pname in events:
+        for etype, pname, match_id in events:
             if _norm(pname or "") != nq:
                 continue
             if etype == "yellow_card":
                 yellow += 1
             elif etype == "red_card":
                 red += 1
-    d = discipline_summary(yellow, red)
+                if match_id is not None and (last_red_match_id is None or match_id > last_red_match_id):
+                    last_red_match_id = match_id
+    d: dict[str, Any] = dict(discipline_summary(yellow, red))
+    last_by_team = _last_played_match_by_team(db, season_id)
+    red_in_last_match = (
+        last_red_match_id is not None
+        and last_red_match_id == last_by_team.get(player.team_id)
+    )
+    suspended, reason = _suspension_state(yellow, red_in_last_match)
+    d["suspended_next_match"] = suspended
+    d["suspension_reason"] = reason
     d.update({"player_id": player_id, "player": player.name,
               "team_id": player.team_id, "season": label})
     return d
