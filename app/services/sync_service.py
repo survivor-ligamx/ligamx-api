@@ -92,6 +92,7 @@ def calculate_week_numbers(matches: List[Dict[str, Any]]):
         else:
             match["week"] = fallback_by_window[window]
 
+
 def compute_standings_from_matches(matches):
     """Calcula la tabla general a partir de los partidos JUGADOS (3 pts victoria,
     1 empate). Util para el backfill de temporadas pasadas: en vez de depender de
