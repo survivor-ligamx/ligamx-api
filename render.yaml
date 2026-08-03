@@ -15,12 +15,20 @@
 #   - Web service:  GET /sync/status  -> database.fingerprint
 #   - GitHub Actions: paso "Show DB target + fingerprint" en el log del workflow
 # Deben ser identicas.
+#
+# IMPORTANTE — comando de arranque:
+# NO usar `alembic upgrade head && uvicorn ...`. Sobre una base que ya tiene el
+# esquema creado, alembic aborta con "relation already exists"; el `&&` corta la
+# cadena, uvicorn nunca arranca y el servicio queda en 503 permanente (ya paso).
+# `scripts/migrate.py` aplica las migraciones de forma tolerante (marca la
+# revision si el esquema ya existe) y siempre cede el paso al servidor.
+# El puerto se toma de $PORT, que Render inyecta; no fijarlo a mano.
 services:
   - type: web
     name: ligamx-api
     runtime: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 10000"
+    startCommand: "python scripts/migrate.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.8"
