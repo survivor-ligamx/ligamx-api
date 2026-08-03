@@ -59,38 +59,38 @@ def calculate_week_numbers(matches: List[Dict[str, Any]]):
     """
 
     def week_start(date):
-days_since_friday = (date.weekday() - 4) % 7
-return (date - timedelta(days=days_since_friday)).date()
+        days_since_friday = (date.weekday() - 4) % 7
+        return (date - timedelta(days=days_since_friday)).date()
 
     dated = [m for m in matches if m.get("match_date")]
     official_by_window: dict[Any, set[int]] = {}
     missing = []
     for match in matches:
-raw_week = match.get("week")
-try:
-    week = int(raw_week)
-except (TypeError, ValueError):
-    week = 0
-if week > 0:
-    match["week"] = week
-    if match.get("match_date"):
-        window = week_start(match["match_date"])
-        official_by_window.setdefault(window, set()).add(week)
-elif match.get("match_date"):
-    missing.append(match)
+        raw_week = match.get("week")
+        try:
+            week = int(raw_week)
+        except (TypeError, ValueError):
+            week = 0
+        if week > 0:
+            match["week"] = week
+            if match.get("match_date"):
+                window = week_start(match["match_date"])
+                official_by_window.setdefault(window, set()).add(week)
+        elif match.get("match_date"):
+            missing.append(match)
 
     if not missing:
-return
+        return
 
     sorted_windows = sorted({week_start(m["match_date"]) for m in dated})
     fallback_by_window = {window: index + 1 for index, window in enumerate(sorted_windows)}
     for match in missing:
-window = week_start(match["match_date"])
-official = official_by_window.get(window, set())
-if len(official) == 1:
-    match["week"] = next(iter(official))
-else:
-    match["week"] = fallback_by_window[window]
+        window = week_start(match["match_date"])
+        official = official_by_window.get(window, set())
+        if len(official) == 1:
+            match["week"] = next(iter(official))
+        else:
+            match["week"] = fallback_by_window[window]
 
 def compute_standings_from_matches(matches):
     """Calcula la tabla general a partir de los partidos JUGADOS (3 pts victoria,
