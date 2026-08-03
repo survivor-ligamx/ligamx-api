@@ -5,7 +5,7 @@ import unicodedata
 from app.database import get_db
 from app.dependencies import get_or_404, resolve_season_label, resolve_season_id, discipline_summary, SUSPENSION_YELLOWS
 from app import models, schemas
-from typing import Optional
+from typing import Any, Optional
 
 router = APIRouter()
 
@@ -30,7 +30,7 @@ def _age_from_birthdate(birth_date):
     return today.year - d.year - ((today.month, today.day) < (d.month, d.day))
 
 
-def _last_played_match_by_team(db, season_id):
+def _last_played_match_by_team(db, season_id) -> dict[Any, Any]:
     """Mapa team_id -> id del ultimo partido YA JUGADO de la temporada.
 
     Se considera jugado cuando home_score no es nulo (no se depende del
@@ -38,7 +38,7 @@ def _last_played_match_by_team(db, season_id):
     expulsion ocurrio en la jornada mas reciente y, por tanto, si el castigo
     sigue vigente para el proximo partido.
     """
-    last_by_team = {}
+    last_by_team: dict[Any, Any] = {}
     if season_id is None:
         return last_by_team
     M = models.Match
@@ -55,7 +55,7 @@ def _last_played_match_by_team(db, season_id):
     return last_by_team
 
 
-def _suspension_state(yellow, red_in_last_match, threshold=SUSPENSION_YELLOWS):
+def _suspension_state(yellow, red_in_last_match, threshold=SUSPENSION_YELLOWS) -> tuple[bool, Optional[str]]:
     """Determina si el jugador esta inhabilitado para el proximo partido.
 
     Dos causas independientes:
@@ -66,6 +66,7 @@ def _suspension_state(yellow, red_in_last_match, threshold=SUSPENSION_YELLOWS):
     y = int(yellow or 0)
     ciclo_completo = y > 0 and y % threshold == 0
     suspended = bool(red_in_last_match) or ciclo_completo
+    reason: Optional[str]
     if red_in_last_match:
         reason = "roja"
     elif ciclo_completo:
@@ -204,7 +205,7 @@ def players_discipline(
     last_by_team = _last_played_match_by_team(db, season_id)
     out = []
     for name, team_id, team_name, yellow, red, last_red_match_id in rows:
-        d = discipline_summary(yellow, red)
+        d: dict[str, Any] = dict(discipline_summary(yellow, red))
         red_in_last_match = (
             last_red_match_id is not None
             and last_red_match_id == last_by_team.get(team_id)
@@ -439,7 +440,7 @@ def get_player_discipline(player_id: int, season: str = Query(None), db: Session
     season_id = resolve_season_id(db, season)
     nq = _norm(player.name)
     yellow = red = 0
-    last_red_match_id = None
+    last_red_match_id: Any = None
     if season_id is not None:
         E, M = models.MatchEvent, models.Match
         events = (
@@ -459,7 +460,7 @@ def get_player_discipline(player_id: int, season: str = Query(None), db: Session
                 red += 1
                 if match_id is not None and (last_red_match_id is None or match_id > last_red_match_id):
                     last_red_match_id = match_id
-    d = discipline_summary(yellow, red)
+    d: dict[str, Any] = dict(discipline_summary(yellow, red))
     last_by_team = _last_played_match_by_team(db, season_id)
     red_in_last_match = (
         last_red_match_id is not None
