@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
+from datetime import datetime
 import unicodedata
 from app.database import get_db
 from app.dependencies import get_or_404, resolve_season_label, resolve_season_id, discipline_summary, SUSPENSION_YELLOWS
@@ -30,25 +31,51 @@ def _age_from_birthdate(birth_date):
     return today.year - d.year - ((today.month, today.day) < (d.month, d.day))
 
 
+# Vocabulario de `status` observado en las fuentes (ESPN / 365Scores).
+_STATUS_JUGADO = {"finished", "final", "ft", "fulltime", "full-time", "completed", "post", "ended"}
+_STATUS_NO_JUGADO = {"scheduled", "pre", "upcoming", "postponed", "canceled", "cancelled", "suspended", "tbd"}
+
+
+def _is_played(status: Any, match_date: Any, now: Any) -> bool:
+    """Decide si un partido ya se disputo.
+
+    NO se puede usar `home_score IS NOT NULL`: los partidos aun no jugados se
+    guardan con marcador 0-0, no nulo. Se usa `status` y, si el valor no se
+    reconoce, se cae a comparar la fecha contra el momento actual.
+    """
+    s = str(status or "").strip().lower()
+    if s in _STATUS_JUGADO:
+        return True
+    if s in _STATUS_NO_JUGADO:
+        return False
+    if match_date is None:
+        return False
+    md = match_date
+    if getattr(md, "tzinfo", None) is not None:
+        md = md.replace(tzinfo=None)
+    return bool(md < now)
+
+
 def _last_played_match_by_team(db, season_id) -> dict[Any, Any]:
     """Mapa team_id -> id del ultimo partido YA JUGADO de la temporada.
 
-    Se considera jugado cuando home_score no es nulo (no se depende del
-    vocabulario de `status`, que varia entre fuentes). Sirve para saber si una
-    expulsion ocurrio en la jornada mas reciente y, por tanto, si el castigo
-    sigue vigente para el proximo partido.
+    Sirve para saber si una expulsion ocurrio en la jornada mas reciente y, por
+    tanto, si el castigo sigue vigente para el proximo partido.
     """
     last_by_team: dict[Any, Any] = {}
     if season_id is None:
         return last_by_team
     M = models.Match
+    now = datetime.utcnow()
     rows = (
-        db.query(M.id, M.home_team_id, M.away_team_id)
-        .filter(M.season_id == season_id, M.home_score.isnot(None))
+        db.query(M.id, M.home_team_id, M.away_team_id, M.status, M.match_date)
+        .filter(M.season_id == season_id)
         .order_by(M.match_date.asc())
         .all()
     )
-    for match_id, home_id, away_id in rows:
+    for match_id, home_id, away_id, status, match_date in rows:
+        if not _is_played(status, match_date, now):
+            continue
         for team_id in (home_id, away_id):
             if team_id is not None:
                 last_by_team[team_id] = match_id
