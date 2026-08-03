@@ -15,40 +15,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: copilot/fix-week-numbering-bug
-      - name: Apply focused source patch and regression tests
+      - name: Apply focused source patch
         run: |
           python - <<'PY'
           from pathlib import Path
 
           path = Path("app/services/sync_service.py")
           text = path.read_text()
-          old = '''def calculate_week_numbers(matches: List[Dict[str, Any]]):
-              """Asigna numeros de jornada basandose en la fecha.
-              La jornada de Liga MX va de viernes a jueves."""
-              matches_with_date = [m for m in matches if m.get("match_date")]
-              if not matches_with_date:
-                  return
-
-              def week_start(date):
-                  days_since_friday = (date.weekday() - 4) % 7
-                  return (date - timedelta(days=days_since_friday)).date()
-
-              matches_with_date.sort(key=lambda m: m["match_date"])
-
-              groups: dict[str, Any] = {}
-              for m in matches_with_date:
-                  ws = week_start(m["match_date"])
-                  groups.setdefault(ws, []).append(m)
-
-              sorted_weeks = sorted(groups.keys())
-              week_number_by_start = {ws: i + 1 for i, ws in enumerate(sorted_weeks)}
-
-              for m in matches_with_date:
-                  ws = week_start(m["match_date"])
-                  m["week"] = week_number_by_start[ws]
-          '''
-          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines()) + "\n"
-          new = '''def calculate_week_numbers(matches: List[Dict[str, Any]]):
+          start = text.index("def calculate_week_numbers(")
+          end = text.index("\ndef compute_standings_from_matches", start)
+          replacement = '''def calculate_week_numbers(matches: List[Dict[str, Any]]):
               """Normaliza la jornada oficial y solo la infiere cuando falta.
 
               ESPN y 365Scores ya publican el numero de jornada. Ese dato es la
@@ -73,7 +49,8 @@ jobs:
                   if week > 0:
                       match["week"] = week
                       if match.get("match_date"):
-                          official_by_window.setdefault(week_start(match["match_date"]), set()).add(week)
+                          window = week_start(match["match_date"])
+                          official_by_window.setdefault(window, set()).add(week)
                   elif match.get("match_date"):
                       missing.append(match)
 
@@ -85,63 +62,23 @@ jobs:
               for match in missing:
                   window = week_start(match["match_date"])
                   official = official_by_window.get(window, set())
-                  match["week"] = next(iter(official)) if len(official) == 1 else fallback_by_window[window]
+                  if len(official) == 1:
+                      match["week"] = next(iter(official))
+                  else:
+                      match["week"] = fallback_by_window[window]
           '''
-          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines()) + "\n"
-          if old not in text:
-              if new in text:
-                  raise SystemExit(0)
-              raise SystemExit("Expected calculate_week_numbers block not found")
-          path.write_text(text.replace(old, new, 1))
-
-          Path("tests/test_week_numbers.py").write_text('''from datetime import datetime
-
-          from app.services.sync_service import calculate_week_numbers
-
-
-          def _match(date: datetime, week=None):
-              return {"match_date": date, "week": week}
-
-
-          def test_preserva_jornada_oficial_en_fecha_doble():
-              matches = [
-                  _match(datetime(2026, 7, 18), 1),
-                  _match(datetime(2026, 7, 21), 2),
-                  _match(datetime(2026, 7, 24), "2"),
-              ]
-
-              calculate_week_numbers(matches)
-
-              assert [match["week"] for match in matches] == [1, 2, 2]
-
-
-          def test_infiere_por_fecha_solo_cuando_falta_week():
-              matches = [
-                  _match(datetime(2026, 7, 18)),
-                  _match(datetime(2026, 7, 25)),
-              ]
-
-              calculate_week_numbers(matches)
-
-              assert [match["week"] for match in matches] == [1, 2]
-
-
-          def test_faltante_hereda_jornada_oficial_de_su_ventana():
-              matches = [
-                  _match(datetime(2026, 7, 25), 4),
-                  _match(datetime(2026, 7, 26)),
-              ]
-
-              calculate_week_numbers(matches)
-
-              assert [match["week"] for match in matches] == [4, 4]
-          '''.replace("          ", ""))
+          # The YAML block indentation is removed before Python sees this file;
+          # remove only the eight spaces intentionally shared by function-body lines.
+          lines = replacement.splitlines()
+          normalized = [lines[0]] + [line[8:] if line.startswith("        ") else line for line in lines[1:]]
+          replacement = "\n".join(normalized) + "\n\n"
+          path.write_text(text[:start] + replacement + text[end + 1 :])
           PY
-      - name: Commit generated patch
+      - name: Commit corrected patch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/services/sync_service.py tests/test_week_numbers.py
+          git add app/services/sync_service.py
           git diff --cached --quiet && exit 0
-          git commit -m "fix(sync): respetar jornada oficial de la fuente"
+          git commit -m "fix(sync): corregir indentación del cálculo de jornadas"
           git push origin HEAD:copilot/fix-week-numbering-bug
