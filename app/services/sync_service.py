@@ -50,29 +50,43 @@ def _validate_season(detected_tournament: str, detected_year: int):
 
 
 def calculate_week_numbers(matches: List[Dict[str, Any]]):
-    """Asigna numeros de jornada basandose en la fecha.
-    La jornada de Liga MX va de viernes a jueves."""
-    matches_with_date = [m for m in matches if m.get("match_date")]
-    if not matches_with_date:
-        return
+    """Normaliza la jornada oficial y solo la infiere cuando falta.
+
+    ESPN y 365Scores ya publican el numero de jornada. Ese dato es la
+    fuente de verdad: una jornada doble puede comenzar entre semana y
+    atravesar la ventana calendario viernes-jueves. La fecha queda como
+    fallback para fuentes que realmente no entreguen ``week``.
+    """
 
     def week_start(date):
         days_since_friday = (date.weekday() - 4) % 7
         return (date - timedelta(days=days_since_friday)).date()
 
-    matches_with_date.sort(key=lambda m: m["match_date"])
+    dated = [m for m in matches if m.get("match_date")]
+    official_by_window: dict[Any, set[int]] = {}
+    missing = []
+    for match in matches:
+        raw_week = match.get("week")
+        try:
+  week = int(raw_week)
+        except (TypeError, ValueError):
+  week = 0
+        if week > 0:
+  match["week"] = week
+  if match.get("match_date"):
+      official_by_window.setdefault(week_start(match["match_date"]), set()).add(week)
+        elif match.get("match_date"):
+  missing.append(match)
 
-    groups: dict[str, Any] = {}
-    for m in matches_with_date:
-        ws = week_start(m["match_date"])
-        groups.setdefault(ws, []).append(m)
+    if not missing:
+        return
 
-    sorted_weeks = sorted(groups.keys())
-    week_number_by_start = {ws: i + 1 for i, ws in enumerate(sorted_weeks)}
-
-    for m in matches_with_date:
-        ws = week_start(m["match_date"])
-        m["week"] = week_number_by_start[ws]
+    sorted_windows = sorted({week_start(m["match_date"]) for m in dated})
+    fallback_by_window = {window: index + 1 for index, window in enumerate(sorted_windows)}
+    for match in missing:
+        window = week_start(match["match_date"])
+        official = official_by_window.get(window, set())
+        match["week"] = next(iter(official)) if len(official) == 1 else fallback_by_window[window]
 
 
 def compute_standings_from_matches(matches):
