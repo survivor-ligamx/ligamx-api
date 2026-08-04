@@ -175,7 +175,9 @@ def merge_official_week_numbers(matches: List[Dict[str, Any]], official_matches:
     updated = 0
     for match in matches:
         raw_event_id = match.get("event_id")
-        event_id = str(raw_event_id) if raw_event_id is not None else None
+        if raw_event_id is None:
+            continue
+        event_id = str(raw_event_id)
         expected_week = OFFICIAL_WEEK_OVERRIDES.get(event_id)
         if expected_week is None:
             continue
