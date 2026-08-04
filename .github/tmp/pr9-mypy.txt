@@ -1,9 +1,0 @@
-app/services/sync_service.py:186: error: Argument 2 to "_teams_match" has
-incompatible type "Any | None"; expected "str"  [arg-type]
-                    _teams_match(home, official.get("home_team"))
-                                       ^~~~~~~~~~~~~~~~~~~~~~~~~
-app/services/sync_service.py:187: error: Argument 2 to "_teams_match" has
-incompatible type "Any | None"; expected "str"  [arg-type]
-                    and _teams_match(away, official.get("away_team"))
-                                           ^~~~~~~~~~~~~~~~~~~~~~~~~
-Found 2 errors in 1 file (checked 1 source file)
