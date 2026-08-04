@@ -15,7 +15,16 @@ from app import models
 
 logger = logging.getLogger(__name__)
 
-OFFICIAL_WEEK_OVERRIDES = {
+KNOWN_WEEK_OVERRIDES = {
+    "401877045": 1,
+    "401877044": 1,
+    "401877043": 1,
+    "401877042": 1,
+    "401877041": 1,
+    "401877040": 1,
+    "401877039": 1,
+    "401877038": 1,
+    "401877037": 1,
     "401877036": 2,
     "401877035": 2,
 }
@@ -170,42 +179,20 @@ def _teams_match(name1: str, name2: str) -> bool:
     return n1 in n2 or n2 in n1 or n1.split()[0] in n2 or n2.split()[0] in n1
 
 
-def merge_official_week_numbers(matches: List[Dict[str, Any]], official_matches: List[Dict[str, Any]]) -> int:
-    """Aplica overrides puntuales de jornada solo a partidos allowlisted."""
+def apply_known_week_overrides(matches: List[Dict[str, Any]]) -> int:
+    """Corrige manualmente partidos conocidos con jornada incorrecta en Apertura 2026."""
     updated = 0
     for match in matches:
         raw_event_id = match.get("event_id")
         if raw_event_id is None:
             continue
         event_id = str(raw_event_id)
-        expected_week = OFFICIAL_WEEK_OVERRIDES.get(event_id)
+        expected_week = KNOWN_WEEK_OVERRIDES.get(event_id)
         if expected_week is None:
             continue
-        home = match.get("home_team")
-        away = match.get("away_team")
-        match_date = match.get("match_date")
-        if not home or not away or not match_date:
-            continue
-        for official in official_matches:
-            try:
-                week = int(official.get("week") or 0)
-            except (TypeError, ValueError):
-                continue
-            official_date = official.get("match_date")
-            official_home = official.get("home_team")
-            official_away = official.get("away_team")
-            if week != expected_week or not official_date:
-                continue
-            if not isinstance(official_home, str) or not isinstance(official_away, str):
-                continue
-            if not (_teams_match(home, official_home) and _teams_match(away, official_away)):
-                continue
-            if abs((match_date.date() - official_date.date()).days) > 2:
-                continue
-            if match.get("week") != expected_week:
-                match["week"] = expected_week
-                updated += 1
-            break
+        if match.get("week") != expected_week:
+            match["week"] = expected_week
+            updated += 1
     return updated
 
 
@@ -697,14 +684,8 @@ def run_sync(db, source: str = "espn"):
         raise ValueError("Datos insuficientes del scraper; se aborta para no vaciar la BD")
 
     if source == "espn":
-        try:
-            from app.scrapers.scores365_scraper import Scores365Scraper
-
-            official_matches = Scores365Scraper().get_matches()
-            updated_weeks = merge_official_week_numbers(raw_matches, official_matches)
-            logger.info(f"Jornadas reconciliadas con 365Scores: {updated_weeks}")
-        except Exception as e:
-            logger.warning(f"No se pudieron reconciliar jornadas con 365Scores: {e}")
+        updated_weeks = apply_known_week_overrides(raw_matches)
+        logger.info(f"Overrides conocidos de jornadas aplicados: {updated_weeks}")
 
     calculate_week_numbers(raw_matches)
     # El torneo/ano se deduce de las fechas REALES de los partidos cargados

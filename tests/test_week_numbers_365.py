@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.services.sync_service import merge_official_week_numbers
+from app.services.sync_service import apply_known_week_overrides
 
 
 def _match(home: str, away: str, date: datetime, week, event_id=None):
@@ -13,50 +13,47 @@ def _match(home: str, away: str, date: datetime, week, event_id=None):
     }
 
 
-def test_365_corrige_jornada_erronea_de_espn():
-    espn = [
+def test_known_overrides_corrigen_j1_y_adelantados_de_j2():
+    matches = [
+        _match("Necaxa", "Atlante", datetime(2026, 7, 17, 1, 0), 2, "401877045"),
+        _match("Tijuana", "Tigres UANL", datetime(2026, 7, 17, 3, 10), 2, "401877044"),
+        _match("Atlético de San Luis", "Cruz Azul", datetime(2026, 7, 18, 1, 0), 2, "401877043"),
         _match("Cruz Azul", "Puebla", datetime(2026, 7, 22, 1, 0), 1, "401877036"),
         _match("Toluca", "Pumas UNAM", datetime(2026, 7, 22, 3, 5), 1, "401877035"),
     ]
-    oficiales = [
-        _match("Cruz Azul", "Puebla", datetime(2026, 7, 22, 1, 0), 2),
-        _match("Toluca", "Pumas UNAM", datetime(2026, 7, 22, 3, 5), "2"),
+
+    actualizados = apply_known_week_overrides(matches)
+
+    assert actualizados == 5
+    assert [match["week"] for match in matches] == [1, 1, 1, 2, 2]
+
+
+def test_known_overrides_cubre_toda_la_jornada_1_de_apertura_2026():
+    matches = [
+        _match("Necaxa", "Atlante", datetime(2026, 7, 17, 1, 0), 2, "401877045"),
+        _match("Tijuana", "Tigres UANL", datetime(2026, 7, 17, 3, 10), 2, "401877044"),
+        _match("Atlético de San Luis", "Cruz Azul", datetime(2026, 7, 18, 1, 0), 2, "401877043"),
+        _match("León", "Atlas", datetime(2026, 7, 18, 1, 0), 2, "401877042"),
+        _match("FC Juarez", "Puebla", datetime(2026, 7, 18, 3, 0), 2, "401877041"),
+        _match("Pumas UNAM", "Pachuca", datetime(2026, 7, 18, 23, 0), 2, "401877040"),
+        _match("Monterrey", "Santos", datetime(2026, 7, 19, 1, 5), 2, "401877038"),
+        _match("Guadalajara", "Toluca", datetime(2026, 7, 19, 1, 7), 2, "401877039"),
+        _match("Querétaro", "América", datetime(2026, 7, 19, 3, 10), 2, "401877037"),
     ]
 
-    actualizados = merge_official_week_numbers(espn, oficiales)
+    actualizados = apply_known_week_overrides(matches)
 
-    assert actualizados == 2
-    assert [match["week"] for match in espn] == [2, 2]
-
-
-def test_365_no_sobrescribe_si_no_hay_partido_equivalente():
-    espn = [_match("Cruz Azul", "Puebla", datetime(2026, 7, 22, 1, 0), 1, "401877036")]
-    oficiales = [_match("Tigres UANL", "Puebla", datetime(2026, 7, 22, 1, 0), 2)]
-
-    actualizados = merge_official_week_numbers(espn, oficiales)
-
-    assert actualizados == 0
-    assert espn[0]["week"] == 1
+    assert actualizados == 9
+    assert all(match["week"] == 1 for match in matches)
 
 
-def test_365_no_contamina_partidos_fuera_de_allowlist():
-    espn = [_match("Necaxa", "Atlante", datetime(2026, 7, 17, 1, 0), 1, "401877045")]
-    oficiales = [_match("Necaxa", "Atlante", datetime(2026, 7, 17, 1, 0), 2)]
-
-    actualizados = merge_official_week_numbers(espn, oficiales)
-
-    assert actualizados == 0
-    assert espn[0]["week"] == 1
-
-
-def test_365_rechaza_jornada_invalida_y_fecha_lejana():
-    espn = [_match("Cruz Azul", "Puebla", datetime(2026, 7, 22, 1, 0), 1, "401877036")]
-    oficiales = [
-        _match("Cruz Azul", "Puebla", datetime(2026, 7, 22, 1, 0), None),
-        _match("Cruz Azul", "Puebla", datetime(2026, 8, 22, 1, 0), 4),
+def test_known_overrides_no_toca_partidos_fuera_del_mapa():
+    matches = [
+        _match("Necaxa", "Monterrey", datetime(2026, 7, 26, 23, 0), 2, "401877029"),
+        _match("Puebla", "Guadalajara", datetime(2026, 8, 1, 1, 0), 3, "401877027"),
     ]
 
-    actualizados = merge_official_week_numbers(espn, oficiales)
+    actualizados = apply_known_week_overrides(matches)
 
     assert actualizados == 0
-    assert espn[0]["week"] == 1
+    assert [match["week"] for match in matches] == [2, 3]
