@@ -27,26 +27,26 @@ def _validate_season(detected_tournament: str, detected_year: int):
       - EXPECTED_TOURNAMENT  (p. ej. "Apertura")
     """
     exp_tournament, exp_year = current_tournament()
-    if os.getenv('EXPECTED_SEASON_YEAR'):
+    if os.getenv("EXPECTED_SEASON_YEAR"):
         try:
-            exp_year = int(os.getenv('EXPECTED_SEASON_YEAR'))  # type: ignore[arg-type]
+            exp_year = int(os.getenv("EXPECTED_SEASON_YEAR"))  # type: ignore[arg-type]
         except ValueError:
-            logger.warning('EXPECTED_SEASON_YEAR no es un entero valido; se ignora')
-    if os.getenv('EXPECTED_TOURNAMENT'):
-        exp_tournament = os.getenv('EXPECTED_TOURNAMENT')
+            logger.warning("EXPECTED_SEASON_YEAR no es un entero valido; se ignora")
+    if os.getenv("EXPECTED_TOURNAMENT"):
+        exp_tournament = os.getenv("EXPECTED_TOURNAMENT")
 
     # El ano es la senal mas fuerte: si no coincide, abortamos.
     if detected_year != exp_year:
         raise ValueError(
-            f'Sync abortado: ano detectado en los datos ({detected_tournament} '
-            f'{detected_year}) != esperado ({exp_tournament} {exp_year}). '
-            f'Se conservan los datos previos. Si es intencional, define '
-            f'EXPECTED_SEASON_YEAR={detected_year}.'
+            f"Sync abortado: ano detectado en los datos ({detected_tournament} "
+            f"{detected_year}) != esperado ({exp_tournament} {exp_year}). "
+            f"Se conservan los datos previos. Si es intencional, define "
+            f"EXPECTED_SEASON_YEAR={detected_year}."
         )
 
     # Diferencia de torneo (mismo ano): solo advertencia (casos borde de calendario).
     if detected_tournament != exp_tournament:
-        logger.warning(f'Torneo detectado ({detected_tournament}) distinto al esperado ({exp_tournament}) para {exp_year}; se continua pero revisa la fuente.')
+        logger.warning(f"Torneo detectado ({detected_tournament}) distinto al esperado ({exp_tournament}) para {exp_year}; se continua pero revisa la fuente.")
 
 
 def calculate_week_numbers(matches: List[Dict[str, Any]]):
@@ -62,11 +62,11 @@ def calculate_week_numbers(matches: List[Dict[str, Any]]):
         days_since_friday = (date.weekday() - 4) % 7
         return (date - timedelta(days=days_since_friday)).date()
 
-    dated = [m for m in matches if m.get('match_date')]
+    dated = [m for m in matches if m.get("match_date")]
     official_by_window: dict[Any, set[int]] = {}
     missing = []
     for match in matches:
-        raw_week = match.get('week')
+        raw_week = match.get("week")
         if raw_week is None:
             week = 0
         else:
@@ -75,25 +75,25 @@ def calculate_week_numbers(matches: List[Dict[str, Any]]):
             except (TypeError, ValueError):
                 week = 0
         if week > 0:
-            match['week'] = week
-            if match.get('match_date'):
-                window = week_start(match['match_date'])
+            match["week"] = week
+            if match.get("match_date"):
+                window = week_start(match["match_date"])
                 official_by_window.setdefault(window, set()).add(week)
-        elif match.get('match_date'):
+        elif match.get("match_date"):
             missing.append(match)
 
     if not missing:
         return
 
-    sorted_windows = sorted({week_start(m['match_date']) for m in dated})
+    sorted_windows = sorted({week_start(m["match_date"]) for m in dated})
     fallback_by_window = {window: index + 1 for index, window in enumerate(sorted_windows)}
     for match in missing:
-        window = week_start(match['match_date'])
+        window = week_start(match["match_date"])
         official = official_by_window.get(window, set())
         if len(official) == 1:
-            match['week'] = next(iter(official))
+            match["week"] = next(iter(official))
         else:
-            match['week'] = fallback_by_window[window]
+            match["week"] = fallback_by_window[window]
 
 
 def compute_standings_from_matches(matches):
@@ -108,51 +108,51 @@ def compute_standings_from_matches(matches):
         return agg.setdefault(
             name,
             {
-                'team_name': name,
-                'played': 0,
-                'won': 0,
-                'drawn': 0,
-                'lost': 0,
-                'goals_for': 0,
-                'goals_against': 0,
-                'points': 0,
+                "team_name": name,
+                "played": 0,
+                "won": 0,
+                "drawn": 0,
+                "lost": 0,
+                "goals_for": 0,
+                "goals_against": 0,
+                "points": 0,
             },
         )
 
     for m in matches:
-        if m.get('status') != 'finished':
+        if m.get("status") != "finished":
             continue
-        hs, as_ = m.get('home_score'), m.get('away_score')
-        h, a = m.get('home_team'), m.get('away_team')
+        hs, as_ = m.get("home_score"), m.get("away_score")
+        h, a = m.get("home_team"), m.get("away_team")
         if hs is None or as_ is None or not h or not a:
             continue
         rh, ra = row(h), row(a)
-        rh['played'] += 1
-        ra['played'] += 1
-        rh['goals_for'] += hs
-        rh['goals_against'] += as_
-        ra['goals_for'] += as_
-        ra['goals_against'] += hs
+        rh["played"] += 1
+        ra["played"] += 1
+        rh["goals_for"] += hs
+        rh["goals_against"] += as_
+        ra["goals_for"] += as_
+        ra["goals_against"] += hs
         if hs > as_:
-            rh['won'] += 1
-            ra['lost'] += 1
-            rh['points'] += 3
+            rh["won"] += 1
+            ra["lost"] += 1
+            rh["points"] += 3
         elif as_ > hs:
-            ra['won'] += 1
-            rh['lost'] += 1
-            ra['points'] += 3
+            ra["won"] += 1
+            rh["lost"] += 1
+            ra["points"] += 3
         else:
-            rh['drawn'] += 1
-            ra['drawn'] += 1
-            rh['points'] += 1
-            ra['points'] += 1
+            rh["drawn"] += 1
+            ra["drawn"] += 1
+            rh["points"] += 1
+            ra["points"] += 1
 
     rows = list(agg.values())
     for r in rows:
-        r['goal_difference'] = r['goals_for'] - r['goals_against']
-    rows.sort(key=lambda r: (r['points'], r['goal_difference'], r['goals_for']), reverse=True)
+        r["goal_difference"] = r["goals_for"] - r["goals_against"]
+    rows.sort(key=lambda r: (r["points"], r["goal_difference"], r["goals_for"]), reverse=True)
     for i, r in enumerate(rows):
-        r['position'] = i + 1
+        r["position"] = i + 1
     return rows
 
 
@@ -160,8 +160,8 @@ def _teams_match(name1: str, name2: str) -> bool:
     """Compara nombres de equipos de ESPN y SofaScore."""
     if not name1 or not name2:
         return False
-    n1 = name1.lower().replace('fc', '').replace('cf', '').replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ü', 'u').strip()
-    n2 = name2.lower().replace('fc', '').replace('cf', '').replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ü', 'u').strip()
+    n1 = name1.lower().replace("fc", "").replace("cf", "").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u").replace("ü", "u").strip()
+    n2 = name2.lower().replace("fc", "").replace("cf", "").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u").replace("ü", "u").strip()
     return n1 in n2 or n2 in n1 or n1.split()[0] in n2 or n2.split()[0] in n1
 
 
@@ -169,19 +169,19 @@ def merge_official_week_numbers(matches: List[Dict[str, Any]], official_matches:
     """Reemplaza jornadas con una fuente equivalente por equipos y fecha."""
     updated = 0
     for match in matches:
-        home = match.get('home_team')
-        away = match.get('away_team')
-        match_date = match.get('match_date')
+        home = match.get("home_team")
+        away = match.get("away_team")
+        match_date = match.get("match_date")
         if not home or not away or not match_date:
             continue
         for official in official_matches:
             try:
-                week = int(official.get('week') or 0)
+                week = int(official.get("week") or 0)
             except (TypeError, ValueError):
                 continue
-            official_date = official.get('match_date')
-            official_home = official.get('home_team')
-            official_away = official.get('away_team')
+            official_date = official.get("match_date")
+            official_home = official.get("home_team")
+            official_away = official.get("away_team")
             if week <= 0 or not official_date:
                 continue
             if not isinstance(official_home, str) or not isinstance(official_away, str):
@@ -190,8 +190,8 @@ def merge_official_week_numbers(matches: List[Dict[str, Any]], official_matches:
                 continue
             if abs((match_date.date() - official_date.date()).days) > 2:
                 continue
-            if match.get('week') != week:
-                match['week'] = week
+            if match.get("week") != week:
+                match["week"] = week
                 updated += 1
             break
     return updated
@@ -201,7 +201,7 @@ def _sync_sofascore_event_ids(db):
     """Busca y guarda sofascore_event_id para cada partido."""
     try:
         sofascore_events = get_sofascore_events()
-        logger.info(f'SofaScore events found: {len(sofascore_events)}')
+        logger.info(f"SofaScore events found: {len(sofascore_events)}")
 
         matches = db.query(models.Match).all()
         updated = 0
@@ -214,19 +214,19 @@ def _sync_sofascore_event_ids(db):
                 continue
 
             for event in sofascore_events:
-                event_home = event.get('homeTeam', {}).get('name', '')
-                event_away = event.get('awayTeam', {}).get('name', '')
+                event_home = event.get("homeTeam", {}).get("name", "")
+                event_away = event.get("awayTeam", {}).get("name", "")
 
                 if _teams_match(home_team, event_home) and _teams_match(away_team, event_away):
-                    match.sofascore_event_id = event.get('id')
+                    match.sofascore_event_id = event.get("id")
                     db.add(match)
                     updated += 1
                     break
 
         db.commit()
-        logger.info(f'SofaScore event IDs updated: {updated}')
+        logger.info(f"SofaScore event IDs updated: {updated}")
     except Exception as e:
-        logger.warning(f'SofaScore event ID sync failed: {e}')
+        logger.warning(f"SofaScore event ID sync failed: {e}")
 
 
 _S_MIN, _S_GOALS, _S_ASSIST, _S_XG, _S_XA = 30, 27, 26, 76, 78
@@ -236,14 +236,14 @@ _S_SHOTS, _S_KEYP, _S_TOUCH, _S_PASSC, _S_INT = 3, 46, 45, 19, 41
 def _stat_int(v):
     if v is None:
         return None
-    m = re.match(r'\s*(-?\d+)', str(v))
+    m = re.match(r"\s*(-?\d+)", str(v))
     return int(m.group(1)) if m else None
 
 
 def _stat_float(v):
     if v is None:
         return None
-    m = re.match(r'\s*(-?\d+(?:\.\d+)?)', str(v))
+    m = re.match(r"\s*(-?\d+(?:\.\d+)?)", str(v))
     return float(m.group(1)) if m else None
 
 
@@ -251,7 +251,7 @@ def _stat_fraction(v):
     """'21/26 (81%)' -> (21, 26). '5' -> (5, None)."""
     if v is None:
         return (None, None)
-    m = re.match(r'\s*(\d+)\s*/\s*(\d+)', str(v))
+    m = re.match(r"\s*(\d+)\s*/\s*(\d+)", str(v))
     if m:
         return (int(m.group(1)), int(m.group(2)))
     return (_stat_int(v), None)
@@ -261,9 +261,9 @@ def _find_365_game(games, home, away, match_date):
     """Empareja un partido de la BD con un juego de 365Scores por nombres de
     equipo y fecha (tolerancia de 2 dias)."""
     for g in games:
-        if not (_teams_match(home, g.get('home_team')) and _teams_match(away, g.get('away_team'))):
+        if not (_teams_match(home, g.get("home_team")) and _teams_match(away, g.get("away_team"))):
             continue
-        gd = g['match_date'].date() if g.get('match_date') else None
+        gd = g["match_date"].date() if g.get("match_date") else None
         if match_date and gd and abs((match_date - gd).days) > 2:
             continue
         return g
@@ -280,14 +280,14 @@ def _sync_365_match_details(db, season, season_id=None):
         from app.scrapers.scores365_scraper import Scores365Scraper
 
         scraper = Scores365Scraper()
-        games = [g for g in scraper.get_matches() if g.get('status') == 'finished']
+        games = [g for g in scraper.get_matches() if g.get("status") == "finished"]
         if not games:
             return
         # Reemplazo idempotente de las stats por jugador de esta temporada.
         db.query(models.PlayerMatchStat).filter(models.PlayerMatchStat.season == season).delete()
         db.commit()
 
-        q = db.query(models.Match).filter(models.Match.status == 'finished')
+        q = db.query(models.Match).filter(models.Match.status == "finished")
         if season_id is not None:
             q = q.filter(models.Match.season_id == season_id)
         db_matches = q.all()
@@ -302,7 +302,7 @@ def _sync_365_match_details(db, season, season_id=None):
             if not g:
                 continue
             try:
-                game = scraper.get_game(g['event_id'])
+                game = scraper.get_game(g["event_id"])
             except Exception as e:
                 logger.warning(f"365 detalle del juego {g.get('event_id')} fallo: {e}")
                 continue
@@ -310,9 +310,9 @@ def _sync_365_match_details(db, season, season_id=None):
             # Arbitro
             if dm.referee is None:
                 try:
-                    info = scraper.get_match_info(g['event_id'], game=game)
-                    if info.get('referee'):
-                        dm.referee = info['referee']
+                    info = scraper.get_match_info(g["event_id"], game=game)
+                    if info.get("referee"):
+                        dm.referee = info["referee"]
                         db.add(dm)
                         refs += 1
                 except Exception:
@@ -320,24 +320,24 @@ def _sync_365_match_details(db, season, season_id=None):
 
             # Stats por jugador (todos los jugadores con minutos, no solo goleadores)
             try:
-                pdata = scraper.get_match_player_stats(g['event_id'], game=game)
+                pdata = scraper.get_match_player_stats(g["event_id"], game=game)
             except Exception:
-                pdata = {'teams': []}
-            for team in pdata.get('teams', []):
+                pdata = {"teams": []}
+            for team in pdata.get("teams", []):
                 # team_id de NUESTRA BD segun local/visitante (los ids de 365 no coinciden)
-                db_team_id = dm.home_team_id if team.get('home_away') == 'home' else dm.away_team_id
-                for p in team.get('players', []) or []:
-                    bt = p.get('stats_by_type') or {}
+                db_team_id = dm.home_team_id if team.get("home_away") == "home" else dm.away_team_id
+                for p in team.get("players", []):
+                    bt = p.get("stats_by_type") or {}
                     pc, pa = _stat_fraction(bt.get(_S_PASSC))
                     db.add(
                         models.PlayerMatchStat(
                             match_id=dm.id,
-                            player_id=p.get('player_id'),
-                            player_name=p.get('name'),
+                            player_id=p.get("player_id"),
+                            player_name=p.get("name"),
                             team_id=db_team_id,
-                            team_name=team.get('team_name'),
+                            team_name=team.get("team_name"),
                             season=season,
-                            starter=1 if p.get('starter') else 0,
+                            starter=1 if p.get("starter") else 0,
                             minutes=_stat_int(bt.get(_S_MIN)),
                             goals=_stat_int(bt.get(_S_GOALS)) or 0,
                             assists=_stat_int(bt.get(_S_ASSIST)) or 0,
@@ -349,17 +349,17 @@ def _sync_365_match_details(db, season, season_id=None):
                             passes_completed=pc,
                             passes_attempted=pa,
                             interceptions=_stat_int(bt.get(_S_INT)),
-                            rating=p.get('rating'),
-                            stats=p.get('stats') or None,
+                            rating=p.get("rating"),
+                            stats=p.get("stats") or None,
                         )
                     )
                     rows += 1
             time.sleep(0.1)
         db.commit()
-        logger.info(f'365 detalle: {refs} arbitros, {rows} filas de stats por jugador')
+        logger.info(f"365 detalle: {refs} arbitros, {rows} filas de stats por jugador")
     except Exception as e:
         db.rollback()
-        logger.warning(f'Sync de detalle 365 fallo (no critico): {e}')
+        logger.warning(f"Sync de detalle 365 fallo (no critico): {e}")
 
 
 def _enrich_team_assets(db):
@@ -370,35 +370,35 @@ def _enrich_team_assets(db):
         assets = extras_scraper.get_team_assets()
         if not assets:
             return
-        by_espn = {a['espn_team_id']: a for a in assets if a.get('espn_team_id')}
+        by_espn = {a["espn_team_id"]: a for a in assets if a.get("espn_team_id")}
         updated_teams = 0
         updated_stadiums = 0
         for team in db.query(models.Team).all():
             a = by_espn.get(team.id)
             if not a:
                 continue
-            if a.get('founded') and not team.founded:
-                team.founded = a['founded']
-            if a.get('badge') and not team.logo_url:
-                team.logo_url = a['badge']
+            if a.get("founded") and not team.founded:
+                team.founded = a["founded"]
+            if a.get("badge") and not team.logo_url:
+                team.logo_url = a["badge"]
             db.add(team)
             updated_teams += 1
-            if team.stadium and a.get('stadium_capacity') and not team.stadium.capacity:
-                team.stadium.capacity = a['stadium_capacity']
+            if team.stadium and a.get("stadium_capacity") and not team.stadium.capacity:
+                team.stadium.capacity = a["stadium_capacity"]
                 db.add(team.stadium)
                 updated_stadiums += 1
         db.commit()
-        logger.info(f'TheSportsDB enrich: {updated_teams} equipos, {updated_stadiums} estadios')
+        logger.info(f"TheSportsDB enrich: {updated_teams} equipos, {updated_stadiums} estadios")
     except Exception as e:
         db.rollback()
-        logger.warning(f'Enriquecimiento TheSportsDB fallo (no critico): {e}')
+        logger.warning(f"Enriquecimiento TheSportsDB fallo (no critico): {e}")
 
 
 def _parse_minute(value):
     """Extrae el minuto (entero) de cadenas como "45'", "90'+2", "45+1'"."""
     if value is None:
         return None
-    m = re.match(r'\s*(\d+)', str(value))
+    m = re.match(r"\s*(\d+)", str(value))
     return int(m.group(1)) if m else None
 
 
@@ -412,60 +412,60 @@ def _sync_events_and_lineups(db, scraper, match_map: Dict[str, Dict], tmap: Dict
     un fallo puntual conserva el ultimo detalle valido del partido.
     """
     if not match_map:
-        logger.info('Sin partidos jugados para detallar (eventos/alineaciones)')
+        logger.info("Sin partidos jugados para detallar (eventos/alineaciones)")
         return
     n_events = n_lineups = 0
     for eid, info in match_map.items():
-        mid, home = info['match_id'], info.get('home')
+        mid, home = info["match_id"], info.get("home")
         # Eventos: primero se obtiene el snapshot nuevo; solo entonces sustituye
         # al anterior para no perder datos ante un fallo de red.
         try:
             events = (scraper.get_match_events(eid, strict=True) if isinstance(scraper, ESPNRequestsScraper) else scraper.get_match_events(eid)) or []
             db.query(models.MatchEvent).filter(models.MatchEvent.match_id == mid).delete(synchronize_session=False)
             for ev in events:
-                tname = ev.get('team_name')
+                tname = ev.get("team_name")
                 db.add(
                     models.MatchEvent(
                         match_id=mid,
-                        event_type=ev.get('category') or 'other',
-                        event_time=_parse_minute(ev.get('minute')),
-                        player_name=ev.get('player'),
+                        event_type=ev.get("category") or "other",
+                        event_time=_parse_minute(ev.get("minute")),
+                        player_name=ev.get("player"),
                         team_id=tmap.get(tname),
                         team_name=tname,
-                        description=ev.get('type'),
+                        description=ev.get("type"),
                         is_home=(1 if tname and tname == home else 0) if tname else None,
                     )
                 )
                 n_events += 1
         except Exception as e:
-            logger.warning(f'Eventos del partido {eid} fallaron: {e}')
+            logger.warning(f"Eventos del partido {eid} fallaron: {e}")
         # Alineaciones
         try:
             lineups = (scraper.get_match_lineups(eid, strict=True) if isinstance(scraper, ESPNRequestsScraper) else scraper.get_match_lineups(eid)) or {}
             db.query(models.MatchLineup).filter(models.MatchLineup.match_id == mid).delete(synchronize_session=False)
-            for team in lineups.get('teams', []):
-                tname = team.get('team_name')
+            for team in lineups.get("teams", []):
+                tname = team.get("team_name")
                 tid = tmap.get(tname)
-                for group, is_sub in (('starters', 0), ('substitutes', 1)):
+                for group, is_sub in (("starters", 0), ("substitutes", 1)):
                     for pl in team.get(group, []) or []:
                         db.add(
                             models.MatchLineup(
                                 match_id=mid,
-                                player_id=pl.get('player_id'),
-                                player_name=pl.get('name'),
+                                player_id=pl.get("player_id"),
+                                player_name=pl.get("name"),
                                 team_id=tid,
                                 team_name=tname,
-                                position=pl.get('position'),
+                                position=pl.get("position"),
                                 is_substitute=is_sub,
-                                jersey_number=pl.get('jersey'),
+                                jersey_number=pl.get("jersey"),
                             )
                         )
                         n_lineups += 1
         except Exception as e:
-            logger.warning(f'Alineaciones del partido {eid} fallaron: {e}')
+            logger.warning(f"Alineaciones del partido {eid} fallaron: {e}")
         time.sleep(0.1)
     db.commit()
-    logger.info(f'Persistidos {n_events} eventos y {n_lineups} jugadores en alineaciones')
+    logger.info(f"Persistidos {n_events} eventos y {n_lineups} jugadores en alineaciones")
 
 
 def _upsert_stadiums(db, stadiums):
@@ -473,16 +473,16 @@ def _upsert_stadiums(db, stadiums):
     entre temporadas)."""
     smap = {}
     for s in stadiums:
-        name = s.get('name')
+        name = s.get("name")
         if not name:
             continue
         st = db.query(models.Stadium).filter(models.Stadium.name == name).first()
         if st is None:
             st = models.Stadium(name=name)
             db.add(st)
-        st.city = s.get('city') or st.city
-        if s.get('capacity'):
-            st.capacity = s['capacity']
+        st.city = s.get("city") or st.city
+        if s.get("capacity"):
+            st.capacity = s["capacity"]
         db.flush()
         smap[name] = st.id
     return smap
@@ -494,24 +494,24 @@ def _upsert_teams(db, teams, smap):
     sobreescriben si llega un valor nuevo no vacio."""
     tmap, team_stadium = {}, {}
     for t in teams:
-        tm = db.get(models.Team, t['id'])
+        tm = db.get(models.Team, t["id"])
         if tm is None:
-            tm = models.Team(id=t['id'])
+            tm = models.Team(id=t["id"])
             db.add(tm)
-        tm.name = t['name']
-        tm.short_name = t.get('short_name') or tm.short_name
-        tm.city = t.get('city') or tm.city
-        tm.colors = t.get('colors') or tm.colors
-        if t.get('founded'):
-            tm.founded = t['founded']
-        if t.get('logo_url'):
-            tm.logo_url = t['logo_url']
-        sid = smap.get(t.get('stadium_name'))
+        tm.name = t["name"]
+        tm.short_name = t.get("short_name") or tm.short_name
+        tm.city = t.get("city") or tm.city
+        tm.colors = t.get("colors") or tm.colors
+        if t.get("founded"):
+            tm.founded = t["founded"]
+        if t.get("logo_url"):
+            tm.logo_url = t["logo_url"]
+        sid = smap.get(t.get("stadium_name"))
         if sid:
             tm.stadium_id = sid
         db.flush()
-        tmap[t['name']] = tm.id
-        tmap[t['id']] = tm.id
+        tmap[t["name"]] = tm.id
+        tmap[t["id"]] = tm.id
         team_stadium[tm.id] = tm.stadium_id
     return tmap, team_stadium
 
@@ -519,23 +519,23 @@ def _upsert_teams(db, teams, smap):
 def _upsert_players(db, players, tmap):
     """Crea o actualiza jugadores por id (compartidos entre temporadas)."""
     for p in players:
-        if not p.get('id'):
+        if not p.get("id"):
             continue
-        pl = db.get(models.Player, p['id'])
+        pl = db.get(models.Player, p["id"])
         if pl is None:
-            pl = models.Player(id=p['id'])
+            pl = models.Player(id=p["id"])
             db.add(pl)
-        pl.name = p['name']
-        pl.position = p.get('position') or pl.position
-        if p.get('number') is not None:
-            pl.number = p['number']
-        pl.nationality = p.get('nationality') or pl.nationality
-        pl.birth_date = p.get('birth_date') or pl.birth_date
-        pl.photo_url = p.get('photo_url') or pl.photo_url
-        pl.flag_url = p.get('flag_url') or pl.flag_url
-        pl.height = p.get('height') or pl.height
-        pl.weight = p.get('weight') or pl.weight
-        tid = tmap.get(p.get('team_name'))
+        pl.name = p["name"]
+        pl.position = p.get("position") or pl.position
+        if p.get("number") is not None:
+            pl.number = p["number"]
+        pl.nationality = p.get("nationality") or pl.nationality
+        pl.birth_date = p.get("birth_date") or pl.birth_date
+        pl.photo_url = p.get("photo_url") or pl.photo_url
+        pl.flag_url = p.get("flag_url") or pl.flag_url
+        pl.height = p.get("height") or pl.height
+        pl.weight = p.get("weight") or pl.weight
+        tid = tmap.get(p.get("team_name"))
         if tid:
             pl.team_id = tid
 
@@ -550,7 +550,7 @@ def _write_season_data(
     standings,
     tournament,
     year,
-    source='espn',
+    source="espn",
 ):
     """Escribe los datos de UNA temporada de forma NO destructiva para las demas:
       - estadios/equipos/jugadores -> upsert (se actualizan, no se borran),
@@ -559,7 +559,7 @@ def _write_season_data(
       - tabla/stats de ESTA temporada -> se recalculan por completo.
     Esto permite acumular varias temporadas (historico) y conservar Match.id.
     Devuelve (season, tmap, team_stadium, match_objs, season_label)."""
-    season_label = f'{tournament} {year}'
+    season_label = f"{tournament} {year}"
 
     smap = _upsert_stadiums(db, stadiums)
     tmap, team_stadium = _upsert_teams(db, teams, smap)
@@ -576,8 +576,8 @@ def _write_season_data(
     # partidos se actualizan in-place por el id estable de ESPN. Asi Match.id y
     # todas sus referencias sobreviven a cada sincronizacion.
     existing_for_season = db.query(models.Match).filter(models.Match.season_id == sn.id).all()
-    is_espn = source == 'espn'
-    incoming_eids = {str(match['event_id']) for match in matches if is_espn and match.get('event_id') is not None}
+    is_espn = source == "espn"
+    incoming_eids = {str(match["event_id"]) for match in matches if is_espn and match.get("event_id") is not None}
     existing_by_eid = {}
     if incoming_eids:
         existing_by_eid = {match.espn_event_id: match for match in db.query(models.Match).filter(models.Match.espn_event_id.in_(incoming_eids)).all()}
@@ -590,22 +590,22 @@ def _write_season_data(
     match_objs = []  # (Match, raw_dict) para enlazar eventos/alineaciones luego
     seen_keys = set()
     for raw_match in matches:
-        hid = tmap.get(raw_match.get('home_team_id')) or tmap.get(raw_match.get('home_team'))
-        aid = tmap.get(raw_match.get('away_team_id')) or tmap.get(raw_match.get('away_team'))
+        hid = tmap.get(raw_match.get("home_team_id")) or tmap.get(raw_match.get("home_team"))
+        aid = tmap.get(raw_match.get("away_team_id")) or tmap.get(raw_match.get("away_team"))
         if not hid or not aid:
             continue
 
-        raw_eid = raw_match.get('event_id')
+        raw_eid = raw_match.get("event_id")
         eid = str(raw_eid) if is_espn and raw_eid is not None else None
-        identity_key = ('espn', eid) if eid is not None else ('fixture', hid, aid, raw_match.get('match_date'))
+        identity_key = ("espn", eid) if eid is not None else ("fixture", hid, aid, raw_match.get("match_date"))
         if identity_key in seen_keys:
-            logger.warning('Partido duplicado en el payload de sync: %s', identity_key)
+            logger.warning("Partido duplicado en el payload de sync: %s", identity_key)
             continue
         seen_keys.add(identity_key)
 
         match = existing_by_eid.get(eid) if eid is not None else None
         if match is None:
-            match = existing_by_fixture.get((hid, aid, raw_match.get('match_date')))
+            match = existing_by_fixture.get((hid, aid, raw_match.get("match_date")))
         if match is None:
             match = models.Match()
             db.add(match)
@@ -614,13 +614,13 @@ def _write_season_data(
         match.home_team_id = hid
         match.away_team_id = aid
         match.stadium_id = team_stadium.get(hid)
-        match.match_date = raw_match.get('match_date')
-        match.home_score = raw_match.get('home_score')
-        match.away_score = raw_match.get('away_score')
-        match.status = raw_match.get('status', 'scheduled')
-        match.week_number = raw_match.get('week')
-        match.stage_name = raw_match.get('stage_name')
-        match.round_name = raw_match.get('round_name')
+        match.match_date = raw_match.get("match_date")
+        match.home_score = raw_match.get("home_score")
+        match.away_score = raw_match.get("away_score")
+        match.status = raw_match.get("status", "scheduled")
+        match.week_number = raw_match.get("week")
+        match.stage_name = raw_match.get("stage_name")
+        match.round_name = raw_match.get("round_name")
         if eid is not None:
             match.espn_event_id = eid
             match.external_event_id = eid
@@ -636,23 +636,23 @@ def _write_season_data(
         db.add(
             models.Standing(
                 season_id=sn.id,
-                team_id=tmap.get(standing.get('team_name')),
-                position=standing['position'],
-                played=standing['played'],
-                won=standing['won'],
-                drawn=standing['drawn'],
-                lost=standing['lost'],
-                goals_for=standing['goals_for'],
-                goals_against=standing['goals_against'],
-                goal_difference=standing['goals_for'] - standing['goals_against'],
-                points=standing['points'],
+                team_id=tmap.get(standing.get("team_name")),
+                position=standing["position"],
+                played=standing["played"],
+                won=standing["won"],
+                drawn=standing["drawn"],
+                lost=standing["lost"],
+                goals_for=standing["goals_for"],
+                goals_against=standing["goals_against"],
+                goal_difference=standing["goals_for"] - standing["goals_against"],
+                points=standing["points"],
             )
         )
 
     return sn, tmap, team_stadium, match_objs, season_label
 
 
-def run_sync(db, source: str = 'espn'):
+def run_sync(db, source: str = "espn"):
     """Ejecuta la sincronizacion completa de datos.
 
     Estrategia segura:
@@ -665,7 +665,7 @@ def run_sync(db, source: str = 'espn'):
       3. ENRICH: stats avanzados, SofaScore y noticias se ejecutan de forma
          aislada; un fallo en estas etapas NO invalida el sync principal.
     """
-    logger.info(f'Iniciando sincronizacion desde {source}')
+    logger.info(f"Iniciando sincronizacion desde {source}")
     scraper = get_scraper(source)
 
     # -------- FASE 1: FETCH (sin tocar la BD) --------
@@ -677,28 +677,28 @@ def run_sync(db, source: str = 'espn'):
         raw_matches = scraper.get_matches()
         raw_standings = scraper.get_standings()
     except Exception as e:
-        logger.error(f'Sync abortado: fallo al obtener datos de {source}: {e}. Los datos previos se conservan intactos.')
+        logger.error(f"Sync abortado: fallo al obtener datos de {source}: {e}. Los datos previos se conservan intactos.")
         raise
 
     if not raw_teams or not raw_matches:
-        logger.error('Sync abortado: el scraper no devolvio equipos/partidos. Los datos previos se conservan intactos.')
-        raise ValueError('Datos insuficientes del scraper; se aborta para no vaciar la BD')
+        logger.error("Sync abortado: el scraper no devolvio equipos/partidos. Los datos previos se conservan intactos.")
+        raise ValueError("Datos insuficientes del scraper; se aborta para no vaciar la BD")
 
-    if source == 'espn':
+    if source == "espn":
         try:
             from app.scrapers.scores365_scraper import Scores365Scraper
 
             official_matches = Scores365Scraper().get_matches()
             updated_weeks = merge_official_week_numbers(raw_matches, official_matches)
-            logger.info(f'Jornadas reconciliadas con 365Scores: {updated_weeks}')
+            logger.info(f"Jornadas reconciliadas con 365Scores: {updated_weeks}")
         except Exception as e:
-            logger.warning(f'No se pudieron reconciliar jornadas con 365Scores: {e}')
+            logger.warning(f"No se pudieron reconciliar jornadas con 365Scores: {e}")
 
     calculate_week_numbers(raw_matches)
     # El torneo/ano se deduce de las fechas REALES de los partidos cargados
     # (p. ej. partidos jul-dic 2026 => "Apertura 2026"), no del mes actual.
     tournament, current_year = tournament_from_matches(raw_matches)
-    logger.info(f'Temporada detectada de los datos: {tournament} {current_year}')
+    logger.info(f"Temporada detectada de los datos: {tournament} {current_year}")
 
     # Red de seguridad: aborta (sin tocar la BD) si no es el torneo/ano esperado.
     _validate_season(tournament, current_year)
@@ -719,7 +719,7 @@ def run_sync(db, source: str = 'espn'):
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error(f'Sync fallo durante la escritura, rollback aplicado. Los datos previos se conservan: {e}')
+        logger.error(f"Sync fallo durante la escritura, rollback aplicado. Los datos previos se conservan: {e}")
         raise
 
     # -------- FASE 3: ENRICH (aislado, no critico) --------
@@ -731,7 +731,7 @@ def run_sync(db, source: str = 'espn'):
         sync_all_stats(db, raw_matches, scraper, tmap, season_label)
     except Exception as e:
         db.rollback()
-        logger.warning(f'sync_all_stats fallo (no critico): {e}')
+        logger.warning(f"sync_all_stats fallo (no critico): {e}")
 
     # SofaScore event IDs (puede fallar por bloqueo de Cloudflare/403)
     _sync_sofascore_event_ids(db)
@@ -748,23 +748,23 @@ def run_sync(db, source: str = 'espn'):
         logger.info(f"Identidad de jugadores: {res['mapped']}/{res['sources_365']} mapeados")
     except Exception as e:
         db.rollback()
-        logger.warning(f'Cruce de identidad de jugadores fallo (no critico): {e}')
+        logger.warning(f"Cruce de identidad de jugadores fallo (no critico): {e}")
 
     # Detalle por partido: eventos (goles/tarjetas/cambios) y alineaciones.
     # Se enlaza por el id externo del partido (solo partidos jugados).
     try:
         match_map = {}
         for mo, raw in match_objs:
-            if raw.get('status') in ('finished', 'live') and raw.get('event_id') is not None:
-                match_map[str(raw['event_id'])] = {
-                    'match_id': mo.id,
-                    'home': raw.get('home_team'),
-                    'away': raw.get('away_team'),
+            if raw.get("status") in ("finished", "live") and raw.get("event_id") is not None:
+                match_map[str(raw["event_id"])] = {
+                    "match_id": mo.id,
+                    "home": raw.get("home_team"),
+                    "away": raw.get("away_team"),
                 }
         _sync_events_and_lineups(db, scraper, match_map, tmap)
     except Exception as e:
         db.rollback()
-        logger.warning(f'Sync de eventos/alineaciones fallo (no critico): {e}')
+        logger.warning(f"Sync de eventos/alineaciones fallo (no critico): {e}")
 
     # News sync (aislado para no invalidar el resto): combina RSS + 365Scores.
     try:
@@ -782,24 +782,24 @@ def run_sync(db, source: str = 'espn'):
                     return None
 
             for n in Scores365Scraper().get_news(limit=30):
-                if n.get('url') and n.get('title'):
+                if n.get("url") and n.get("title"):
                     news_items.append(
                         {
-                            'title': n['title'],
-                            'link': n['url'],
-                            'description': n['title'],
-                            'source': '365Scores',
-                            'image_url': n.get('image'),
-                            'published_at': _parse_365_date(n.get('published_at')),
+                            "title": n["title"],
+                            "link": n["url"],
+                            "description": n["title"],
+                            "source": "365Scores",
+                            "image_url": n.get("image"),
+                            "published_at": _parse_365_date(n.get("published_at")),
                         }
                     )
         except Exception as e:
-            logger.warning(f'Noticias 365Scores fallaron (no critico): {e}')
+            logger.warning(f"Noticias 365Scores fallaron (no critico): {e}")
 
         # Dedup por enlace
         seen, unique = set(), []
         for n in news_items:
-            link = n.get('link')
+            link = n.get("link")
             if not link or link in seen:
                 continue
             seen.add(link)
@@ -809,32 +809,32 @@ def run_sync(db, source: str = 'espn'):
         for n in unique:
             db.add(
                 models.News(
-                    title=n.get('title'),
-                    link=n.get('link'),
-                    description=n.get('description'),
-                    source=n.get('source'),
-                    image_url=n.get('image_url'),
-                    published_at=n.get('published_at'),
+                    title=n.get("title"),
+                    link=n.get("link"),
+                    description=n.get("description"),
+                    source=n.get("source"),
+                    image_url=n.get("image_url"),
+                    published_at=n.get("published_at"),
                 )
             )
         db.commit()
-        logger.info(f'Noticias sincronizadas: {len(unique)} (RSS + 365Scores)')
+        logger.info(f"Noticias sincronizadas: {len(unique)} (RSS + 365Scores)")
     except Exception as e:
         db.rollback()
-        logger.warning(f'Sync de noticias fallo (no critico): {e}')
+        logger.warning(f"Sync de noticias fallo (no critico): {e}")
 
-    logger.info('Sincronizacion completada')
+    logger.info("Sincronizacion completada")
 
     return {
-        'stadiums': len(raw_stadiums),
-        'teams': len(raw_teams),
-        'players': len(db.query(models.Player).all()),
-        'matches': db.query(models.Match).filter(models.Match.season_id == sn.id).count(),
-        'season': season_label,
+        "stadiums": len(raw_stadiums),
+        "teams": len(raw_teams),
+        "players": len(db.query(models.Player).all()),
+        "matches": db.query(models.Match).filter(models.Match.season_id == sn.id).count(),
+        "season": season_label,
     }
 
 
-def run_sync_with_log(db, source: str = 'espn'):
+def run_sync_with_log(db, source: str = "espn"):
     """Ejecuta run_sync y registra el resultado (exito o error) en sync_logs.
     Devuelve el resultado del sync; relanza la excepcion si falla."""
     started = datetime.now(timezone.utc)
@@ -846,7 +846,7 @@ def run_sync_with_log(db, source: str = 'espn'):
             db.add(
                 models.SyncLog(
                     source=source,
-                    status='error',
+                    status="error",
                     detail=str(e)[:500],
                     started_at=started,
                     duration_seconds=(datetime.now(timezone.utc) - started).total_seconds(),
@@ -860,12 +860,12 @@ def run_sync_with_log(db, source: str = 'espn'):
         db.add(
             models.SyncLog(
                 source=source,
-                status='success',
-                detail='ok',
-                season=result.get('season'),
-                teams=result.get('teams'),
-                players=result.get('players'),
-                matches=result.get('matches'),
+                status="success",
+                detail="ok",
+                season=result.get("season"),
+                teams=result.get("teams"),
+                players=result.get("players"),
+                matches=result.get("matches"),
                 started_at=started,
                 duration_seconds=(datetime.now(timezone.utc) - started).total_seconds(),
             )
@@ -876,7 +876,7 @@ def run_sync_with_log(db, source: str = 'espn'):
     return result
 
 
-def run_backfill(db, year: int, tournament: str, source: str = 'espn'):
+def run_backfill(db, year: int, tournament: str, source: str = "espn"):
     """Carga (backfill) una temporada PASADA concreta sin tocar las demas.
 
     A diferencia de run_sync (que detecta el torneo vigente y enriquece con datos
@@ -886,9 +886,9 @@ def run_backfill(db, year: int, tournament: str, source: str = 'espn'):
 
     No enriquece con 365Scores/noticias (esos datos solo existen para lo reciente).
     """
-    if tournament not in ('Apertura', 'Clausura'):
+    if tournament not in ("Apertura", "Clausura"):
         raise ValueError("tournament debe ser 'Apertura' o 'Clausura'")
-    logger.info(f'Backfill de {tournament} {year} desde {source}')
+    logger.info(f"Backfill de {tournament} {year} desde {source}")
     scraper = get_scraper(source)
 
     try:
@@ -897,11 +897,11 @@ def run_backfill(db, year: int, tournament: str, source: str = 'espn'):
         raw_players = scraper.get_players()
         raw_matches = scraper.get_matches(season_id=year, tournament=tournament)
     except Exception as e:
-        logger.error(f'Backfill abortado: fallo al obtener datos: {e}')
+        logger.error(f"Backfill abortado: fallo al obtener datos: {e}")
         raise
 
     if not raw_matches:
-        raise ValueError(f'Sin partidos para {tournament} {year}; no se backfillea nada')
+        raise ValueError(f"Sin partidos para {tournament} {year}; no se backfillea nada")
 
     calculate_week_numbers(raw_matches)
     standings = compute_standings_from_matches(raw_matches)
@@ -921,21 +921,21 @@ def run_backfill(db, year: int, tournament: str, source: str = 'espn'):
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error(f'Backfill fallo durante la escritura, rollback aplicado: {e}')
+        logger.error(f"Backfill fallo durante la escritura, rollback aplicado: {e}")
         raise
 
-    finished = sum(1 for m in raw_matches if m.get('status') == 'finished')
-    logger.info(f'Backfill {season_label} OK: {len(raw_matches)} partidos, tabla de {len(standings)} equipos')
+    finished = sum(1 for m in raw_matches if m.get("status") == "finished")
+    logger.info(f"Backfill {season_label} OK: {len(raw_matches)} partidos, tabla de {len(standings)} equipos")
     return {
-        'season': season_label,
-        'teams': len(raw_teams),
-        'matches': db.query(models.Match).filter(models.Match.season_id == sn.id).count(),
-        'finished_matches': finished,
-        'standings_rows': len(standings),
+        "season": season_label,
+        "teams": len(raw_teams),
+        "matches": db.query(models.Match).filter(models.Match.season_id == sn.id).count(),
+        "finished_matches": finished,
+        "standings_rows": len(standings),
     }
 
 
-def run_backfill_with_log(db, year: int, tournament: str, source: str = 'espn'):
+def run_backfill_with_log(db, year: int, tournament: str, source: str = "espn"):
     """Ejecuta run_backfill y registra el resultado en sync_logs."""
     started = datetime.now(timezone.utc)
     try:
@@ -945,8 +945,8 @@ def run_backfill_with_log(db, year: int, tournament: str, source: str = 'espn'):
             db.rollback()
             db.add(
                 models.SyncLog(
-                    source=f'backfill:{tournament} {year}',
-                    status='error',
+                    source=f"backfill:{tournament} {year}",
+                    status="error",
                     detail=str(e)[:500],
                     started_at=started,
                     duration_seconds=(datetime.now(timezone.utc) - started).total_seconds(),
@@ -959,12 +959,12 @@ def run_backfill_with_log(db, year: int, tournament: str, source: str = 'espn'):
     try:
         db.add(
             models.SyncLog(
-                source=f'backfill:{source}',
-                status='success',
-                detail='ok',
-                season=result.get('season'),
-                teams=result.get('teams'),
-                matches=result.get('matches'),
+                source=f"backfill:{source}",
+                status="success",
+                detail="ok",
+                season=result.get("season"),
+                teams=result.get("teams"),
+                matches=result.get("matches"),
                 started_at=started,
                 duration_seconds=(datetime.now(timezone.utc) - started).total_seconds(),
             )
