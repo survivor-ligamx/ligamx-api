@@ -165,6 +165,37 @@ def _teams_match(name1: str, name2: str) -> bool:
     return n1 in n2 or n2 in n1 or n1.split()[0] in n2 or n2.split()[0] in n1
 
 
+def merge_official_week_numbers(matches: List[Dict[str, Any]], official_matches: List[Dict[str, Any]]) -> int:
+    """Reemplaza jornadas con una fuente equivalente por equipos y fecha."""
+    updated = 0
+    for match in matches:
+        home = match.get("home_team")
+        away = match.get("away_team")
+        match_date = match.get("match_date")
+        if not home or not away or not match_date:
+            continue
+        for official in official_matches:
+            try:
+                week = int(official.get("week") or 0)
+            except (TypeError, ValueError):
+                continue
+            official_date = official.get("match_date")
+            if week <= 0 or not official_date:
+                continue
+            if not (
+                _teams_match(home, official.get("home_team"))
+                and _teams_match(away, official.get("away_team"))
+            ):
+                continue
+            if abs((match_date.date() - official_date.date()).days) > 2:
+                continue
+            if match.get("week") != week:
+                match["week"] = week
+                updated += 1
+            break
+    return updated
+
+
 def _sync_sofascore_event_ids(db):
     """Busca y guarda sofascore_event_id para cada partido."""
     try:
@@ -651,6 +682,16 @@ def run_sync(db, source: str = "espn"):
     if not raw_teams or not raw_matches:
         logger.error("Sync abortado: el scraper no devolvio equipos/partidos. Los datos previos se conservan intactos.")
         raise ValueError("Datos insuficientes del scraper; se aborta para no vaciar la BD")
+
+    if source == "espn":
+        try:
+            from app.scrapers.scores365_scraper import Scores365Scraper
+
+            official_matches = Scores365Scraper().get_matches()
+            updated_weeks = merge_official_week_numbers(raw_matches, official_matches)
+            logger.info(f"Jornadas reconciliadas con 365Scores: {updated_weeks}")
+        except Exception as e:
+            logger.warning(f"No se pudieron reconciliar jornadas con 365Scores: {e}")
 
     calculate_week_numbers(raw_matches)
     # El torneo/ano se deduce de las fechas REALES de los partidos cargados
