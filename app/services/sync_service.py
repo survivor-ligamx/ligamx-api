@@ -15,6 +15,11 @@ from app import models
 
 logger = logging.getLogger(__name__)
 
+OFFICIAL_WEEK_OVERRIDES = {
+    "401877036": 2,
+    "401877035": 2,
+}
+
 
 def _validate_season(detected_tournament: str, detected_year: int):
     """Red de seguridad: verifica que los datos detectados correspondan al
@@ -166,9 +171,14 @@ def _teams_match(name1: str, name2: str) -> bool:
 
 
 def merge_official_week_numbers(matches: List[Dict[str, Any]], official_matches: List[Dict[str, Any]]) -> int:
-    """Reemplaza jornadas con una fuente equivalente por equipos y fecha."""
+    """Aplica overrides puntuales de jornada solo a partidos allowlisted."""
     updated = 0
     for match in matches:
+        raw_event_id = match.get("event_id")
+        event_id = str(raw_event_id) if raw_event_id is not None else None
+        expected_week = OFFICIAL_WEEK_OVERRIDES.get(event_id)
+        if expected_week is None:
+            continue
         home = match.get("home_team")
         away = match.get("away_team")
         match_date = match.get("match_date")
@@ -182,7 +192,7 @@ def merge_official_week_numbers(matches: List[Dict[str, Any]], official_matches:
             official_date = official.get("match_date")
             official_home = official.get("home_team")
             official_away = official.get("away_team")
-            if week <= 0 or not official_date:
+            if week != expected_week or not official_date:
                 continue
             if not isinstance(official_home, str) or not isinstance(official_away, str):
                 continue
@@ -190,8 +200,8 @@ def merge_official_week_numbers(matches: List[Dict[str, Any]], official_matches:
                 continue
             if abs((match_date.date() - official_date.date()).days) > 2:
                 continue
-            if match.get("week") != week:
-                match["week"] = week
+            if match.get("week") != expected_week:
+                match["week"] = expected_week
                 updated += 1
             break
     return updated
