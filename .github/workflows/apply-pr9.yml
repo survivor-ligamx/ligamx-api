@@ -24,61 +24,66 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+
           path = Path("app/services/sync_service.py")
           text = path.read_text(encoding="utf-8")
+
+          helper = '''
+
+def merge_official_week_numbers(matches, official_matches):
+    """Reemplaza jornadas con una fuente equivalente por equipos y fecha."""
+    updated = 0
+    for match in matches:
+        home = match.get("home_team")
+        away = match.get("away_team")
+        match_date = match.get("match_date")
+        if not home or not away or not match_date:
+            continue
+        for official in official_matches:
+            try:
+                week = int(official.get("week") or 0)
+            except (TypeError, ValueError):
+                continue
+            official_date = official.get("match_date")
+            if week <= 0 or not official_date:
+                continue
+            if not (
+                _teams_match(home, official.get("home_team"))
+                and _teams_match(away, official.get("away_team"))
+            ):
+                continue
+            if abs((match_date.date() - official_date.date()).days) > 2:
+                continue
+            if match.get("week") != week:
+                match["week"] = week
+                updated += 1
+            break
+    return updated
+'''
+
           marker = "\n\ndef _sync_sofascore_event_ids(db):\n"
-          lines = [
-              "",
-              "",
-              "def merge_official_week_numbers(matches, official_matches):",
-              "    \"\"\"Reemplaza jornadas con una fuente equivalente por equipos y fecha.\"\"\"",
-              "    updated = 0",
-              "    for match in matches:",
-              "        home = match.get(\"home_team\")",
-              "        away = match.get(\"away_team\")",
-              "        match_date = match.get(\"match_date\")",
-              "        if not home or not away or not match_date:",
-              "            continue",
-              "        for official in official_matches:",
-              "            try:",
-              "                week = int(official.get(\"week\") or 0)",
-              "            except (TypeError, ValueError):",
-              "                continue",
-              "            official_date = official.get(\"match_date\")",
-              "            if week <= 0 or not official_date:",
-              "                continue",
-              "            if not (",
-              "                _teams_match(home, official.get(\"home_team\"))",
-              "                and _teams_match(away, official.get(\"away_team\"))",
-              "            ):",
-              "                continue",
-              "            if abs((match_date.date() - official_date.date()).days) > 2:",
-              "                continue",
-              "            if match.get(\"week\") != week:",
-              "                match[\"week\"] = week",
-              "                updated += 1",
-              "            break",
-              "    return updated",
-          ]
-          assert text.count(marker) == 1
-          text = text.replace(marker, "\n".join(lines) + marker, 1)
+          if "def merge_official_week_numbers(" not in text:
+              assert marker in text
+              text = text.replace(marker, helper + marker, 1)
+
           old = "    calculate_week_numbers(raw_matches)\n"
-          replacement = [
-              "    if source == \"espn\":",
-              "        try:",
-              "            from app.scrapers.scores365_scraper import Scores365Scraper",
-              "",
-              "            official_matches = Scores365Scraper().get_matches()",
-              "            updated_weeks = merge_official_week_numbers(raw_matches, official_matches)",
-              "            logger.info(f\"Jornadas reconciliadas con 365Scores: {updated_weeks}\")",
-              "        except Exception as e:",
-              "            logger.warning(f\"No se pudieron reconciliar jornadas con 365Scores: {e}\")",
-              "",
-              "    calculate_week_numbers(raw_matches)",
-              "",
-          ]
-          assert text.count(old) == 1
-          path.write_text(text.replace(old, "\n".join(replacement), 1), encoding="utf-8")
+          new = '''    if source == "espn":
+        try:
+            from app.scrapers.scores365_scraper import Scores365Scraper
+
+            official_matches = Scores365Scraper().get_matches()
+            updated_weeks = merge_official_week_numbers(raw_matches, official_matches)
+            logger.info(f"Jornadas reconciliadas con 365Scores: {updated_weeks}")
+        except Exception as e:
+            logger.warning(f"No se pudieron reconciliar jornadas con 365Scores: {e}")
+
+    calculate_week_numbers(raw_matches)
+'''
+          if "Jornadas reconciliadas con 365Scores" not in text:
+              assert old in text
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding="utf-8")
           PY
           pip install -r requirements.txt
           pip install ruff pytest
